@@ -1,0 +1,12 @@
+general:
+  seed: 42
+
+data:
+  use_full_dataset: False
+  path: '../twitter-datasets/'
+
+hf:
+  model: 'vinai/bertweet-large'
+  train_batch: 128
+  test_batch: 128
+  max_len: 128
