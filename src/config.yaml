@@ -10,3 +10,9 @@ hf:
   train_batch: 128
   test_batch: 128
   max_len: 128
+
+model:
+  embedding_dim: 10
+  hidden_dim: 100
+  layers: 2
+  epochs: 20

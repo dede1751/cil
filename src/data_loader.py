@@ -5,7 +5,7 @@ import pandas as pd
 from box import Box
 from torch.utils.data import DataLoader
 from transformers import DataCollatorWithPadding, AutoTokenizer
-
+from sklearn.model_selection import train_test_split
 
 class TwitterDataset():
     """
@@ -41,8 +41,12 @@ class TwitterDataset():
         test_df = self._read_data("test_data.txt")
         test_df['tweet'] = test_df['tweet'].apply(lambda x: ",".join(x.split(",", 1)[1:]))
 
-        self.dataset = DatasetDict(
-            {'train': Dataset.from_pandas(train_df), 'test': Dataset.from_pandas(test_df)})
+        train_df, val_df = train_test_split(train_df, test_size=0.2)
+        self.dataset = DatasetDict({
+            'train': Dataset.from_pandas(train_df),
+            'eval': Dataset.from_pandas(val_df),
+            'test': Dataset.from_pandas(test_df)
+        })
 
     def to_hf_dataloader(self, tokenizer: AutoTokenizer) -> tuple[DataLoader, DataLoader]:
         """
@@ -55,13 +59,15 @@ class TwitterDataset():
             batched=True)
 
         tokenized['train'].set_format('torch', columns=["input_ids", "attention_mask", "label"])
+        tokenized['eval'].set_format('torch', columns=["input_ids", "attention_mask", "label"])
         tokenized['test'].set_format('torch', columns=["input_ids", "attention_mask"])
 
         data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
         train = DataLoader(tokenized['train'], shuffle=True, batch_size=self.cfg.hf.train_batch, collate_fn=data_collator)
+        eval = DataLoader(tokenized['eval'], shuffle=True, batch_size=self.cfg.hf.train_batch, collate_fn=data_collator)
         test = DataLoader(tokenized['test'], batch_size = self.cfg.hf.test_batch, collate_fn=data_collator)
-        return train, test
+        return train, eval, test
 
 
 if __name__ == "__main__":
@@ -70,4 +76,4 @@ if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
     dataset = TwitterDataset(cfg)
-    train_hf, test_hf = dataset.to_hf_dataloader(AutoTokenizer.from_pretrained(cfg.hf.model))
+    train_hf, eval_hf, test_hf = dataset.to_hf_dataloader(AutoTokenizer.from_pretrained(cfg.hf.model))
