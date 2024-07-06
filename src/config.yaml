@@ -3,7 +3,7 @@ general:
 
 data:
   use_full_dataset: True
-  max_samples: 10
+  max_samples: None
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
 

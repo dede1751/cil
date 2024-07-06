@@ -78,6 +78,8 @@ class LLMClassifier():
             per_device_eval_batch_size=self.cfg.llm.batch_size,
             num_train_epochs=self.cfg.llm.epochs,
             weight_decay=self.cfg.llm.weight_decay,
+            metric_for_best_model='accuracy',
+            greater_is_better=True,
             load_best_model_at_end=True,
         )
 
