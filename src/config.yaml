@@ -2,11 +2,19 @@ general:
   seed: 42
 
 data:
-  use_full_dataset: False
+  use_full_dataset: True
+  max_samples: 10
   path: '../twitter-datasets/'
+  checkpoint_path: 'checkpoints/'
 
-hf:
-  model: 'vinai/bertweet-large'
-  train_batch: 128
-  test_batch: 128
+llm:
+  model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+  special_tokens: False
+  use_lora: False
+  lora_r: 16
+  lora_alpha: 32
   max_len: 128
+  epochs: 3
+  lr: 2.e-5
+  batch_size: 32
+  weight_decay: 0.01

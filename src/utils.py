@@ -7,7 +7,7 @@ import yaml
 import torch
 
 
-def load_config():
+def load_config() -> Box:
     """
     Loads the global configuration file.
     """
@@ -16,7 +16,7 @@ def load_config():
     return Box(config)
 
 
-def set_seed(seed):
+def set_seed(seed: int):
     """
     Sets random number generator seeds for PyTorch and NumPy to ensure reproducibility of results.
     """
@@ -27,3 +27,12 @@ def set_seed(seed):
     np.random.seed(seed)
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
+
+def save_outputs(outputs: np.ndarray, file_name: str):
+    """
+    Save the model outputs to a file.
+    :param outputs: Model outputs, np.ndarry with shape (10'000,) and values in {-1, 1}
+    """
+    indices = np.arange(1, outputs.shape[0] + 1)
+    combined = np.column_stack((indices, outputs))
+    np.savetxt(f'{file_name}.csv', combined, delimiter=',', fmt='%d')
