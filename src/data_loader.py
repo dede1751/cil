@@ -25,10 +25,7 @@ class TwitterDataset():
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
-        if max_samples is not None:
-            lines = lines[:max_samples]
-
-        tweets = [line.strip() for line in lines]
+        tweets = [line.strip() for line in lines[:max_samples]]
         return pd.DataFrame(tweets, columns=['text'])
 
     def _load_dataset(self):
