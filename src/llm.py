@@ -1,3 +1,5 @@
+import os
+
 from box import Box
 import numpy as np
 import torch
@@ -8,35 +10,42 @@ from transformers import (
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
+from scipy.special import softmax
 import evaluate
 
 
 def compute_metrics(eval_pred):
-    accuracy = evaluate.load("accuracy")
+    load_accuracy = evaluate.load("accuracy")
+    load_f1 = evaluate.load("f1")
     predictions, labels = eval_pred
 
-    predictions = np.argmax(predictions, axis=1)
-    labels = [1.0 if l[0] == 0 else 0.0 for l in labels]
+    predictions = np.argmax(predictions, axis=-1)
+    labels = np.argmax(labels, axis=-1)
 
-    return accuracy.compute(predictions=predictions, references=labels)
+    accuracy = load_accuracy.compute(predictions=predictions, references=labels)["accuracy"]
+    f1 = load_f1.compute(predictions=predictions, references=labels)["f1"]
+    return {"accuracy": accuracy, "f1": f1}
+
+def preprocess_twitter_roberta(text):
+    """
+    Tweet pre-processing function for 'twitter-roberta-base-sentiment-latest'.
+    https://huggingface.co/cardiffnlp/twitter-roberta-base-sentiment-latest
+    """
+    return text.replace("<user>", "@user").replace("<url>", "http")
 
 
 class LLMClassifier():
     """
     Sentiment classifier using a Large Language Model with a classification head.
+    Initializes the model in cfg.llm.model, which can be a Hub model or a local checkpoint.
     """
-    def __init__(self, config: Box, checkpoint_path: str = None):
+    def __init__(self, config: Box):
         self.cfg = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        if checkpoint_path is None:
-            model_name = self.cfg.llm.model
-        else:
-            model_name = checkpoint_path
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.llm.model)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
+            self.cfg.llm.model,
             num_labels=2,
             id2label={0: "NEGATIVE", 1: "POSITIVE"},
             label2id={"NEGATIVE": 0, "POSITIVE": 1},
@@ -70,12 +79,13 @@ class LLMClassifier():
         :param dataset: Tokenized split datasets ready for the HF Trainer
         """
         training_args = TrainingArguments(
-            output_dir=self.cfg.data.checkpoint_path,
+            output_dir=os.path.join(self.cfg.data.checkpoint_path, self.cfg.general.run_id),
             eval_strategy="epoch",
             save_strategy="epoch",
             learning_rate=self.cfg.llm.lr,
             per_device_train_batch_size=self.cfg.llm.batch_size,
             per_device_eval_batch_size=self.cfg.llm.batch_size,
+            gradient_accumulation_steps=self.cfg.llm.gradient_accumulation_steps,
             num_train_epochs=self.cfg.llm.epochs,
             weight_decay=self.cfg.llm.weight_decay,
             metric_for_best_model='accuracy',
@@ -95,10 +105,7 @@ class LLMClassifier():
             compute_metrics=compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
         )
-
         trainer.train()
-        results = trainer.evaluate()
-        print(results)
 
     def test(self, dataset: DatasetDict) -> np.ndarray:
         """
@@ -116,7 +123,14 @@ class LLMClassifier():
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 outputs = self.model(**inputs)
                 scores = outputs.logits.cpu().detach().numpy()
-                result = np.where(scores[:, 0] > scores[:, 1], -1, 1).reshape(-1, 1)
+
+                if self.cfg.llm.sample_from_output:
+                    scores = softmax(scores, axis=1)
+                    result = np.array(
+                        [np.random.choice([-1, 1], p=score) for score in scores]).reshape(-1, 1)
+                else:
+                    result = np.where(scores[:, 0] > scores[:, 1], -1, 1).reshape(-1, 1)
+
                 results.append(result)
 
         return np.squeeze(np.vstack(results))
@@ -130,8 +144,9 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
-    tokenized_dataset = TwitterDataset(cfg).tokenize_to_hf(llm.tokenizer)
+    twitter = TwitterDataset(cfg)
+    tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer, preprocess_twitter_roberta)
     llm.train(tokenized_dataset)
 
-    outputs = llm.test(tokenized_dataset)
-    save_outputs(outputs, "llm_outputs")
+    llm_outputs = llm.test(tokenized_dataset)
+    save_outputs(llm_outputs, cfg.general.run_id)

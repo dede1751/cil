@@ -1,14 +1,18 @@
 general:
   seed: 42
+  run_id: 't2'
 
 data:
   use_full_dataset: True
   max_samples: null
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
+  soft_labels: True
 
 llm:
   model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+  # model: 'checkpoints/<checkpoint-folder>'
+  sample_from_output: False
   special_tokens: False
   use_lora: False
   lora_r: 16
@@ -16,5 +20,6 @@ llm:
   max_len: 128
   epochs: 3
   lr: 2.e-5
-  batch_size: 32
+  batch_size: 16
+  gradient_accumulation_steps: 1
   weight_decay: 0.01

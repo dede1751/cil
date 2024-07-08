@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 
 from datasets import DatasetDict, Dataset
 import pandas as pd
@@ -19,6 +20,7 @@ class TwitterDataset():
         self.dataset = self._load_dataset()
         for split in self.dataset:
             print(f"Number of rows in '{split}' dataset: {self.dataset[split].num_rows}")
+        print("\n")
 
     def _read_data(self, file: str, max_samples: str = None) -> pd.DataFrame:
         file_path = os.path.join(self.cfg.data.path, file)
@@ -37,12 +39,17 @@ class TwitterDataset():
             train_neg = self._read_data("train_neg.txt", max_samples=max_samples)
             train_pos = self._read_data("train_pos.txt", max_samples=max_samples)
 
-        train_neg['label'] = -1.0
+        train_neg['label'] = 0.0
         train_pos['label'] = 1.0
         train_df = pd.concat([train_neg, train_pos], ignore_index=True)
 
         test_df = self._read_data("test_data.txt")
         test_df['text'] = test_df['text'].apply(lambda x: ",".join(x.split(",", 1)[1:]))
+
+        if self.cfg.data.soft_labels:
+            old_rows = train_df.shape[0]
+            train_df = train_df.groupby('text', as_index=False).mean()
+            print(f"Soft labels removed {old_rows - train_df.shape[0]} rows.")
 
         train_df, eval_df = train_test_split(
             train_df, test_size=0.2, random_state=self.cfg.general.seed)
@@ -55,31 +62,37 @@ class TwitterDataset():
             'eval': Dataset.from_pandas(eval_df),
             'test': Dataset.from_pandas(test_df)})
 
-    def tokenize_to_hf(self, tokenizer: AutoTokenizer) -> DatasetDict:
+    def tokenize_to_hf(
+        self,
+        tokenizer: AutoTokenizer,
+        preprocessor: Callable[[str], str] = lambda x: x,
+    ) -> DatasetDict:
         """
         Tokenize the dataset using a HuggingFace AutoTokenizer.
         Formats the dataset to torch tensors and converts labels to one-hot.
         :param tokenizer: A HuggingFace AutoTokenizer object.
+        :param preprocessor: A function to preprocess the text data.
         :return: Tokenized split datasets ready for the HF Trainer
         """
-        tokenized = self.dataset.map(lambda x:
-            tokenizer(x['text'], max_length=self.cfg.llm.max_len, padding='max_length', truncation=True),
-            batched=True)
+        def tokenize_fn(examples):
+            examples = [preprocessor(text) for text in examples['text']]
+            return tokenizer(
+                examples,
+                max_length=self.cfg.llm.max_len,
+                padding='max_length',
+                truncation=True)
 
         def one_hot_encode_label(example):
-            if example['label'] == -1.0:
-                example['label'] = [1.0, 0.0]
-            elif example['label'] == 1.0:
-                example['label'] = [0.0, 1.0]
+            example['label'] = [1.0 - example['label'], example['label']]
             return example
 
+        tokenized = self.dataset.map(tokenize_fn, batched=True)
         tokenized["train"] = tokenized["train"].map(one_hot_encode_label)
         tokenized["eval"] = tokenized["eval"].map(one_hot_encode_label)
 
         tokenized["train"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["eval"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["test"].set_format(type='torch', columns=['input_ids', 'attention_mask'])
-
         return tokenized
 
 
@@ -89,4 +102,5 @@ if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
     twitter = TwitterDataset(cfg)
-    tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.hf.model))
+
+    #tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))

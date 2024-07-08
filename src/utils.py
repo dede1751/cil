@@ -35,4 +35,6 @@ def save_outputs(outputs: np.ndarray, file_name: str):
     """
     indices = np.arange(1, outputs.shape[0] + 1)
     combined = np.column_stack((indices, outputs))
-    np.savetxt(f'{file_name}.csv', combined, delimiter=',', fmt='%d')
+
+    np.savetxt(
+        f'{file_name}.csv', combined, delimiter=',', fmt='%d', header="Id,Prediction", comments='')
