@@ -143,7 +143,6 @@ if __name__ == "__main__":
 
     num_epochs = cfg.model.epochs
     for epoch in range(epoch_init+1, num_epochs):
-        print(next(model.parameters()))
         # Train the model on the train set
         train(model, train_hf, optimizer, criterion, epoch, num_epochs)
 
