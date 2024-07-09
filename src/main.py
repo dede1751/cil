@@ -132,7 +132,7 @@ if __name__ == "__main__":
     model.to(device)
 
     criterion = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.03)
+    optimizer = optim.Adam(model.parameters())
     epoch_init = -1
 
     if cfg.model.checkpoint_path:
