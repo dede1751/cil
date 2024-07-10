@@ -17,6 +17,11 @@ import evaluate
 THRESHOLD = 0.5
 
 
+def preprocessor(tweet: str) -> str:
+    """Custom preprocessor for the Bertweet Tokenizer."""
+    return tweet.replace("<user>", "@USER").replace("<url>", "http")
+
+
 def compute_metrics(eval_pred):
     load_accuracy = evaluate.load("accuracy")
     load_f1 = evaluate.load("f1")
@@ -88,11 +93,6 @@ class LLMClassifier():
         original_model = AutoModel.from_pretrained(self.cfg.llm.model)
         self.model = CustomRobertaForSequenceClassification(original_model)
 
-        if self.cfg.llm.special_tokens:
-            special_tokens_dict = {'additional_special_tokens': ['<user>', '<url>']}
-            self.tokenizer.add_special_tokens(special_tokens_dict)
-            self.model.resize_token_embeddings(len(self.tokenizer))
-
         if self.cfg.llm.use_lora:
             lora_config = LoraConfig(
                 r=self.cfg.llm.lora_r,
@@ -108,7 +108,9 @@ class LLMClassifier():
             self.model = get_peft_model(self.model, lora_config)
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        print(f"\n'{self.cfg.llm.model}' loaded with {trainable} trainable parameters.\n")
+        precision = "fp16" if self.cfg.llm.use_fp16 else "fp32"
+        print(f"\n'{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.\n")
+
 
     def train(self, dataset: DatasetDict):
         """
@@ -119,13 +121,14 @@ class LLMClassifier():
             output_dir=os.path.join(self.cfg.data.checkpoint_path, self.cfg.general.run_id),
             eval_strategy="epoch",
             save_strategy="epoch",
+            num_train_epochs=self.cfg.llm.epochs,
             learning_rate=self.cfg.llm.lr,
             warmup_steps=self.cfg.llm.warmup_steps,
             per_device_train_batch_size=self.cfg.llm.batch_size,
             per_device_eval_batch_size=self.cfg.llm.batch_size,
             gradient_accumulation_steps=self.cfg.llm.gradient_accumulation_steps,
-            num_train_epochs=self.cfg.llm.epochs,
             weight_decay=self.cfg.llm.weight_decay,
+            fp16=self.cfg.llm.use_fp16,
             metric_for_best_model='accuracy',
             greater_is_better=True,
             load_best_model_at_end=True,
@@ -177,8 +180,7 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
-    print(llm.model)
-    twitter = TwitterDataset(cfg)
+    twitter = TwitterDataset(cfg, preprocessor)
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     llm.train(tokenized_dataset)
 

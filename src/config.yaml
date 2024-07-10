@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'bertweet-large-d200'
+  run_id: 'btwt-b-fp32-b32-d200'
 
 data:
   use_full_dataset: False
@@ -10,9 +10,9 @@ data:
   soft_labels: True
 
 llm:
-  model: 'vinai/bertweet-large'
+  model: 'vinai/bertweet-base'
   # model: 'checkpoints/<checkpoint-folder>'
-  special_tokens: False
+  use_fp16: False
   use_lora: False
   lora_r: 16
   lora_alpha: 32
@@ -20,6 +20,6 @@ llm:
   epochs: 3
   lr: 2.e-5
   warmup_steps: 500
-  batch_size: 16
+  batch_size: 32
   gradient_accumulation_steps: 1
   weight_decay: 0.01

@@ -1,4 +1,5 @@
 import os
+from typing import Callable
 
 from datasets import DatasetDict, Dataset
 import pandas as pd
@@ -11,32 +12,35 @@ class TwitterDataset():
     """
     Custom dataset class for Twitter data. Provides datasets for the different ML frameworks.
     """
-    def __init__(self, config: Box):
+    def __init__(self, config: Box, preprocessor: Callable[[str], str] = None):
         """
         Load the dataset from the default data files. Performs train-test split.
         """
         self.cfg = config
+        self.preprocessor = preprocessor
         self.dataset = self._load_dataset()
         for split in self.dataset:
             print(f"Number of rows in '{split}' dataset: {self.dataset[split].num_rows}")
         print("\n")
 
-    def _read_data(self, file: str, max_samples: str = None) -> pd.DataFrame:
+    def _read_data(self, file: str) -> pd.DataFrame:
         file_path = os.path.join(self.cfg.data.path, file)
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
-        tweets = [line.strip() for line in lines[:max_samples]]
+        tweets = [line.strip() for line in lines[:self.cfg.data.max_samples]]
+        if self.preprocessor is not None:
+            tweets = [self.preprocessor(tweet) for tweet in tweets]
+
         return pd.DataFrame(tweets, columns=['text'])
 
     def _load_dataset(self):
-        max_samples = self.cfg.data.max_samples
         if self.cfg.data.use_full_dataset:
-            train_neg = self._read_data("train_neg_full.txt", max_samples=max_samples)
-            train_pos = self._read_data("train_pos_full.txt", max_samples=max_samples)
+            train_neg = self._read_data("train_neg_full.txt")
+            train_pos = self._read_data("train_pos_full.txt")
         else:
-            train_neg = self._read_data("train_neg.txt", max_samples=max_samples)
-            train_pos = self._read_data("train_pos.txt", max_samples=max_samples)
+            train_neg = self._read_data("train_neg.txt")
+            train_pos = self._read_data("train_pos.txt")
 
         train_neg['label'] = 0.0
         train_pos['label'] = 1.0
