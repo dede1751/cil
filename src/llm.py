@@ -4,11 +4,11 @@ from box import Box
 import numpy as np
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 from datasets import DatasetDict
 from transformers import (
-    AutoTokenizer, AutoConfig, AutoModel,
-    DataCollatorWithPadding, Trainer, TrainingArguments, EarlyStoppingCallback,)
-from torch.utils.data import DataLoader
+    AutoTokenizer, AutoModel, DataCollatorWithPadding,
+    Trainer, TrainingArguments, EarlyStoppingCallback,)
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
 import evaluate
@@ -62,7 +62,7 @@ class CustomRobertaForSequenceClassification(nn.Module):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
         )
-        sequence_output = outputs[0]
+        sequence_output = outputs[0][:, 0, :] # [CLS] token output
         logits = self.classifier_dropout(sequence_output)
         logits = self.classifier(logits).squeeze(-1)
 
@@ -85,12 +85,7 @@ class LLMClassifier():
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.llm.model)
-        model_config = AutoConfig.from_pretrained(
-            self.cfg.llm.model,
-            num_labels=1,
-            output_hidden_state=True
-        )
-        original_model = AutoModel.from_config(model_config)
+        original_model = AutoModel.from_pretrained(self.cfg.llm.model)
         self.model = CustomRobertaForSequenceClassification(original_model)
 
         if self.cfg.llm.special_tokens:
@@ -125,6 +120,7 @@ class LLMClassifier():
             eval_strategy="epoch",
             save_strategy="epoch",
             learning_rate=self.cfg.llm.lr,
+            warmup_steps=self.cfg.llm.warmup_steps,
             per_device_train_batch_size=self.cfg.llm.batch_size,
             per_device_eval_batch_size=self.cfg.llm.batch_size,
             gradient_accumulation_steps=self.cfg.llm.gradient_accumulation_steps,
