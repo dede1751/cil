@@ -10,7 +10,7 @@ data:
   soft_labels: True
 
 llm:
-  model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+  model: 'vinai/bertweet-base'
   # model: 'checkpoints/<checkpoint-folder>'
   special_tokens: False
   use_lora: False

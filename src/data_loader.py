@@ -82,7 +82,14 @@ class TwitterDataset():
                 padding='max_length',
                 truncation=True)
 
+        def expand_dim(example):
+            example['label'] = [example['label']] # need this because output is [batch_size, 1]
+            return example
+
         tokenized = self.dataset.map(tokenize_fn, batched=True)
+        tokenized["train"] = tokenized["train"].map(expand_dim)
+        tokenized["eval"] = tokenized["eval"].map(expand_dim)
+
         tokenized["train"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["eval"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["test"].set_format(type='torch', columns=['input_ids', 'attention_mask'])
