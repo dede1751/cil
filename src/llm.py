@@ -3,9 +3,10 @@ import os.path
 from box import Box
 import numpy as np
 import torch
+from torch import nn
 from datasets import DatasetDict
 from transformers import (
-    AutoTokenizer, AutoConfig, RobertaForSequenceClassification,
+    AutoTokenizer, AutoConfig, AutoModel,
     DataCollatorWithPadding, Trainer, TrainingArguments, EarlyStoppingCallback,)
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -14,14 +15,6 @@ import evaluate
 
 
 THRESHOLD = 0.5
-
-
-def preprocess_twitter_roberta(text):
-    """
-    Tweet pre-processing function for 'twitter-roberta-base-sentiment-latest'.
-    https://huggingface.co/cardiffnlp/twitter-roberta-base-sentiment-latest
-    """
-    return text.replace("<user>", "@user").replace("<url>", "http")
 
 
 def compute_metrics(eval_pred):
@@ -38,6 +31,50 @@ def compute_metrics(eval_pred):
     }
 
 
+class CustomRobertaForSequenceClassification(nn.Module):
+    """Custom RobertaForSequenceClassification without dense layer in classifier."""
+
+    def __init__(self, original_model):
+        super(CustomRobertaForSequenceClassification, self).__init__()
+        self.roberta = original_model
+        self.classifier_dropout = nn.Dropout(original_model.config.hidden_dropout_prob)
+        self.classifier = nn.Linear(original_model.config.hidden_size, 1)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None
+    ):
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+        sequence_output = outputs[0]
+        logits = self.classifier_dropout(sequence_output)
+        logits = self.classifier(logits).squeeze(-1)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.BCEWithLogitsLoss()
+            loss = loss_fct(logits, labels.float())
+
+        output = (logits,) + outputs[2:]
+        return ((loss,) + output) if loss is not None else output
+
+
 class LLMClassifier():
     """
     Sentiment classifier using a Large Language Model with a classification head.
@@ -51,10 +88,10 @@ class LLMClassifier():
         model_config = AutoConfig.from_pretrained(
             self.cfg.llm.model,
             num_labels=1,
-            problem_type="multi_label_classification",
-            ignore_mismatched_sizes=True,
+            output_hidden_state=True
         )
-        self.model = RobertaForSequenceClassification(model_config)
+        original_model = AutoModel.from_config(model_config)
+        self.model = CustomRobertaForSequenceClassification(original_model)
 
         if self.cfg.llm.special_tokens:
             special_tokens_dict = {'additional_special_tokens': ['<user>', '<url>']}
@@ -124,7 +161,7 @@ class LLMClassifier():
         loader = DataLoader(dataset["test"], batch_size=self.cfg.llm.batch_size, shuffle=False)
         results = []
         with torch.no_grad():
-            sigmoid = torch.nn.Sigmoid()
+            sigmoid = nn.Sigmoid()
             for batch in tqdm(loader, desc="Computing Submission"):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 outputs = self.model(**inputs)[0]
@@ -144,8 +181,9 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
+    print(llm.model)
     twitter = TwitterDataset(cfg)
-    tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer, preprocess_twitter_roberta)
+    tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     llm.train(tokenized_dataset)
 
     llm_outputs = llm.test(tokenized_dataset)

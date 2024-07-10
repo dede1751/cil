@@ -1,5 +1,4 @@
 import os
-from typing import Callable
 
 from datasets import DatasetDict, Dataset
 import pandas as pd
@@ -66,30 +65,20 @@ class TwitterDataset():
     def tokenize_to_hf(
         self,
         tokenizer: AutoTokenizer,
-        preprocessor: Callable[[str], str] = lambda x: x,
     ) -> DatasetDict:
         """
-        Preprocess and tokenize the dataset using a HuggingFace AutoTokenizer.
+        Tokenize the dataset using a HuggingFace AutoTokenizer.
         :param tokenizer: A HuggingFace AutoTokenizer object.
-        :param preprocessor: A function to preprocess the text data.
         :return: Tokenized split datasets ready for the HF Trainer
         """
         def tokenize_fn(examples):
-            examples = [preprocessor(text) for text in examples['text']]
             return tokenizer(
-                examples,
+                examples['text'],
                 max_length=self.cfg.llm.max_len,
                 padding='max_length',
                 truncation=True)
 
-        def expand_dim(example):
-            example['label'] = [example['label']] # need this because output is [batch_size, 1]
-            return example
-
         tokenized = self.dataset.map(tokenize_fn, batched=True)
-        tokenized["train"] = tokenized["train"].map(expand_dim)
-        tokenized["eval"] = tokenized["eval"].map(expand_dim)
-
         tokenized["train"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["eval"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["test"].set_format(type='torch', columns=['input_ids', 'attention_mask'])
