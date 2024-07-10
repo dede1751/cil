@@ -12,7 +12,6 @@ data:
 llm:
   model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
   # model: 'checkpoints/<checkpoint-folder>'
-  sample_from_output: False
   special_tokens: False
   use_lora: False
   lora_r: 16
@@ -20,6 +19,6 @@ llm:
   max_len: 128
   epochs: 3
   lr: 2.e-5
-  batch_size: 16
+  batch_size: 32
   gradient_accumulation_steps: 1
   weight_decay: 0.01

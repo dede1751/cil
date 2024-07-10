@@ -1,8 +1,9 @@
-import os
+import os.path
 
 from box import Box
 import numpy as np
 import torch
+import torch.nn as nn
 from datasets import DatasetDict
 from transformers import (
     AutoTokenizer, AutoModelForSequenceClassification, DataCollatorWithPadding,
@@ -10,21 +11,11 @@ from transformers import (
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
-from scipy.special import softmax
 import evaluate
 
 
-def compute_metrics(eval_pred):
-    load_accuracy = evaluate.load("accuracy")
-    load_f1 = evaluate.load("f1")
-    predictions, labels = eval_pred
+THRESHOLD = 0.5
 
-    predictions = np.argmax(predictions, axis=-1)
-    labels = np.argmax(labels, axis=-1)
-
-    accuracy = load_accuracy.compute(predictions=predictions, references=labels)["accuracy"]
-    f1 = load_f1.compute(predictions=predictions, references=labels)["f1"]
-    return {"accuracy": accuracy, "f1": f1}
 
 def preprocess_twitter_roberta(text):
     """
@@ -32,6 +23,65 @@ def preprocess_twitter_roberta(text):
     https://huggingface.co/cardiffnlp/twitter-roberta-base-sentiment-latest
     """
     return text.replace("<user>", "@user").replace("<url>", "http")
+
+
+def compute_metrics(eval_pred):
+    load_accuracy = evaluate.load("accuracy")
+    load_f1 = evaluate.load("f1")
+    predictions, labels = eval_pred
+
+    predictions = (predictions >= THRESHOLD).astype(int)
+    labels = labels.astype(int)
+
+    return {
+        "accuracy": load_accuracy.compute(predictions=predictions, references=labels)["accuracy"],
+        "f1": load_f1.compute(predictions=predictions, references=labels)["f1"]
+    }
+
+
+class CustomRobertaForSequenceClassification(nn.Module):
+    """Extends RobertaForSequenceClassification to adapt to a single output."""
+
+    def __init__(self, original_model):
+        super(CustomRobertaForSequenceClassification, self).__init__()
+        self.roberta = original_model.roberta
+        self.classifier = original_model.classifier
+        self.additional_proj = nn.Linear(3, 1)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=None,
+        output_hidden_states=None
+    ):
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+        )
+        sequence_output = outputs[0]
+        logits = self.classifier(sequence_output)
+        logits = self.additional_proj(logits)
+        logits = logits.squeeze(-1)
+
+        loss = None
+        if labels is not None:
+            loss_fct = nn.BCEWithLogitsLoss()
+            loss = loss_fct(logits, labels.float())
+
+        output = (logits,) + outputs[2:]
+        return ((loss,) + output) if loss is not None else output
 
 
 class LLMClassifier():
@@ -44,13 +94,11 @@ class LLMClassifier():
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.llm.model)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        original_model = AutoModelForSequenceClassification.from_pretrained(
             self.cfg.llm.model,
-            num_labels=2,
-            id2label={0: "NEGATIVE", 1: "POSITIVE"},
-            label2id={"NEGATIVE": 0, "POSITIVE": 1},
-            ignore_mismatched_sizes=True
+            ignore_mismatched_sizes=True,
         )
+        self.model = CustomRobertaForSequenceClassification(original_model)
 
         if self.cfg.llm.special_tokens:
             special_tokens_dict = {'additional_special_tokens': ['<user>', '<url>']}
@@ -61,6 +109,7 @@ class LLMClassifier():
             lora_config = LoraConfig(
                 r=self.cfg.llm.lora_r,
                 lora_alpha=self.cfg.llm.lora_alpha,
+                use_rslora=True,
                 target_modules=["query", "value"],
                 lora_dropout=0.1,
                 bias="none",
@@ -119,18 +168,13 @@ class LLMClassifier():
         loader = DataLoader(dataset["test"], batch_size=self.cfg.llm.batch_size, shuffle=False)
         results = []
         with torch.no_grad():
+            sigmoid = nn.Sigmoid()
             for batch in tqdm(loader, desc="Computing Submission"):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
-                outputs = self.model(**inputs)
-                scores = outputs.logits.cpu().detach().numpy()
+                outputs = self.model(**inputs)[0]
+                outputs = sigmoid(outputs).cpu().detach().numpy()
 
-                if self.cfg.llm.sample_from_output:
-                    scores = softmax(scores, axis=1)
-                    result = np.array(
-                        [np.random.choice([-1, 1], p=score) for score in scores]).reshape(-1, 1)
-                else:
-                    result = np.where(scores[:, 0] > scores[:, 1], -1, 1).reshape(-1, 1)
-
+                result = np.where(outputs >= THRESHOLD, 1, -1).reshape(-1, 1)
                 results.append(result)
 
         return np.squeeze(np.vstack(results))
