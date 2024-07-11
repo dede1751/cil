@@ -146,7 +146,7 @@ class LLMClassifier():
             compute_metrics=compute_metrics,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
         )
-        trainer.train()
+        trainer.train(resume_from_checkpoint=self.cfg.llm.resume_from_checkpoint)
 
     def test(self, dataset: DatasetDict) -> np.ndarray:
         """
