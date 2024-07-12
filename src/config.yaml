@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'btwt-b-fp32-b32-soft2000'
+  run_id: 'btwt-b-b32-e5-soft'
 
 data:
   use_full_dataset: True
@@ -8,11 +8,12 @@ data:
   eval_split: 0.05
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
-  soft_labels: True
+  dedup_strategy: 'smooth'
+  smoothing_epsilon: 0.01
 
 llm:
   model: 'vinai/bertweet-base'
-  resume_from_checkpoint: 'checkpoints/btwt-b-fp32-b32-s2000/checkpoint-171744'
+  resume_from_checkpoint: null
   use_fp16: False
   use_lora: False
   lora_r: 16

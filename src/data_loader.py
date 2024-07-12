@@ -52,12 +52,22 @@ class TwitterDataset():
         train_df, eval_df = train_test_split(
             train_df, test_size=self.cfg.data.eval_split, random_state=self.cfg.general.seed)
 
-        # We leave hard-labels and duplicates in the eval split.
-        if self.cfg.data.soft_labels:
-            old_rows = train_df.shape[0]
+        # hard: deduplicates and picks the most common label between 0 and 1
+        # soft: deduplicates and averages the labels
+        # smooth: deduplicates and smooths the labels with epsilon
+        # null: no deduplication, labels are 0 and 1
+        old_rows = train_df.shape[0]
+        if self.cfg.data.dedup_strategy == "hard":
             train_df = train_df.groupby('text', as_index=False).mean()
-            print(f"Soft labels removed {old_rows - train_df.shape[0]} rows.")
+            train_df['label'] = train_df['label'].apply(lambda x: 0 if x < 0.5 else 1.0)
+        elif self.cfg.data.dedup_strategy == "soft":
+            train_df = train_df.groupby('text', as_index=False).mean()
+        elif self.cfg.data.dedup_strategy == "smooth":
+            epsilon = self.cfg.data.smoothing_epsilon
+            train_df = train_df.groupby('text', as_index=False).mean()
+            train_df['label'] = train_df['label'].apply(lambda x: x * (1 - epsilon) + 0.5 * epsilon)
 
+        print(f"Removed {old_rows - train_df.shape[0]} duplicates.")
         train_df = train_df.reset_index(drop=True)
         eval_df = eval_df.reset_index(drop=True)
 
@@ -96,4 +106,4 @@ if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
     twitter = TwitterDataset(cfg)
-    tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))
+    #tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))
