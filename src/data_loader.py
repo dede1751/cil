@@ -40,13 +40,14 @@ class TwitterDataset():
 
         test_df = self._read_data("test_data.txt")
         test_df['tweet'] = test_df['tweet'].apply(lambda x: ",".join(x.split(",", 1)[1:]))
-        
+
+        train_df, val_df = train_test_split(train_df, test_size=0.2)
+
         # Remove duplicates, keeping the most common label
         most_common_labels = train_df.groupby('tweet')['label'].agg(lambda x: x.value_counts().idxmax())
         train_df = train_df.drop_duplicates(subset='tweet').set_index('tweet')
         train_df['label'] = most_common_labels
 
-        train_df, val_df = train_test_split(train_df, test_size=0.2)
         self.dataset = DatasetDict({
             'train': Dataset.from_pandas(train_df),
             'eval': Dataset.from_pandas(val_df),

@@ -126,6 +126,12 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
     dataset = TwitterDataset(cfg)
     tokenizer = AutoTokenizer.from_pretrained(cfg.hf.model)
+    
+    # new tokens
+    # new_tokens = ["<user>", "<url>"]
+    # new_tokens = set(new_tokens) - set(tokenizer.vocab.keys())
+    # tokenizer.add_tokens(list(new_tokens))
+    
     train_hf, val_hf, test_hf = dataset.to_hf_dataloader(tokenizer)
 
     model = BiLSTM(cfg, len(tokenizer))
