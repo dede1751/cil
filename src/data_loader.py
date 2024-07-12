@@ -50,7 +50,7 @@ class TwitterDataset():
         test_df['text'] = test_df['text'].apply(lambda x: ",".join(x.split(",", 1)[1:]))
 
         train_df, eval_df = train_test_split(
-            train_df, test_size=0.2, random_state=self.cfg.general.seed)
+            train_df, test_size=self.cfg.data.eval_split, random_state=self.cfg.general.seed)
 
         # We leave hard-labels and duplicates in the eval split.
         if self.cfg.data.soft_labels:

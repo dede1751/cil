@@ -132,6 +132,7 @@ class LLMClassifier():
             metric_for_best_model='accuracy',
             greater_is_better=True,
             load_best_model_at_end=True,
+            restore_callback_states_from_checkpoint=True,
         )
 
         data_collator = DataCollatorWithPadding(self.tokenizer)

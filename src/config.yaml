@@ -1,10 +1,11 @@
 general:
   seed: 42
-  run_id: 'btwt-b-fp32-b32-d200'
+  run_id: 'btwt-b-fp32-b32-soft2000'
 
 data:
   use_full_dataset: True
   max_samples: null
+  eval_split: 0.05
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
   soft_labels: True
@@ -17,8 +18,8 @@ llm:
   lora_r: 16
   lora_alpha: 32
   max_len: 128
-  epochs: 5
-  lr: 2.e-5
+  epochs: 3
+  lr: 1.e-4
   warmup_steps: 500
   batch_size: 32
   gradient_accumulation_steps: 1
