@@ -1,14 +1,14 @@
 general:
   seed: 42
-  run_id: 'btwt-b-b32-e5-soft'
+  run_id: 'logit'
 
 data:
-  use_full_dataset: True
+  use_full_dataset: False
   max_samples: null
   eval_split: 0.05
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
-  dedup_strategy: 'smooth'
+  dedup_strategy: 'hard'
   smoothing_epsilon: 0.01
 
 llm:
@@ -25,3 +25,12 @@ llm:
   batch_size: 32
   gradient_accumulation_steps: 1
   weight_decay: 0.01
+
+logit: 
+  max_iter: 1000
+  max_features: 1000
+
+rf:
+  n_estimators: 100
+  max_features: 1000
+  max_depth: 100
