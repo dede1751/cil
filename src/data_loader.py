@@ -21,14 +21,13 @@ class TwitterDataset():
         self.dataset = self._load_dataset()
         for split in self.dataset:
             print(f"Number of rows in '{split}' dataset: {self.dataset[split].num_rows}")
-        print("\n")
 
-    def _read_data(self, file: str) -> pd.DataFrame:
+    def _read_data(self, file: str, max_samples: int = None) -> pd.DataFrame:
         file_path = os.path.join(self.cfg.data.path, file)
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
-        tweets = [line.strip() for line in lines[:self.cfg.data.max_samples]]
+        tweets = [line.strip() for line in lines[:max_samples]]
         if self.preprocessor is not None:
             tweets = [self.preprocessor(tweet) for tweet in tweets]
 
@@ -36,11 +35,11 @@ class TwitterDataset():
 
     def _load_dataset(self):
         if self.cfg.data.use_full_dataset:
-            train_neg = self._read_data("train_neg_full.txt")
-            train_pos = self._read_data("train_pos_full.txt")
+            train_neg = self._read_data("train_neg_full.txt", self.cfg.data.max_samples)
+            train_pos = self._read_data("train_pos_full.txt", self.cfg.data.max_samples)
         else:
-            train_neg = self._read_data("train_neg.txt")
-            train_pos = self._read_data("train_pos.txt")
+            train_neg = self._read_data("train_neg.txt", self.cfg.data.max_samples)
+            train_pos = self._read_data("train_pos.txt", self.cfg.data.max_samples)
 
         train_neg['label'] = 0.0
         train_pos['label'] = 1.0
@@ -67,7 +66,7 @@ class TwitterDataset():
             train_df = train_df.groupby('text', as_index=False).mean()
             train_df['label'] = train_df['label'].apply(lambda x: x * (1 - epsilon) + 0.5 * epsilon)
 
-        print(f"Removed {old_rows - train_df.shape[0]} duplicates.")
+        print(f"[+] Removed {old_rows - train_df.shape[0]} duplicates.")
         train_df = train_df.reset_index(drop=True)
         eval_df = eval_df.reset_index(drop=True)
 
@@ -92,6 +91,7 @@ class TwitterDataset():
                 padding='max_length',
                 truncation=True)
 
+        print(f"[+] Tokenizing the dataset using {tokenizer.__class__.__name__}.")
         tokenized = self.dataset.map(tokenize_fn, batched=True)
         tokenized["train"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["eval"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
@@ -106,4 +106,4 @@ if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
     twitter = TwitterDataset(cfg)
-    #tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))
+    tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))

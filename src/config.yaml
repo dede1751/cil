@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'btwt-b-b32-e5-soft'
+  run_id: 'ensemble_avg'
 
 data:
   use_full_dataset: True
@@ -20,8 +20,23 @@ llm:
   lora_alpha: 32
   max_len: 128
   epochs: 3
-  lr: 1.e-4
+  lr: 2.e-5
   warmup_steps: 500
   batch_size: 32
   gradient_accumulation_steps: 1
   weight_decay: 0.01
+
+ensemble:
+  models: [
+    'btwt-b-b32-e5-smooth/checkpoint-202515',
+    'btwt-b-b32-e5-soft/checkpoint-202515',
+    'btwt-b-b32-e5-hard/checkpoint-202515',
+    'btwt-b-b32-e5-none/checkpoint-222657'
+  ]
+  base_models: [
+    'vinai/bertweet-base',
+    'vinai/bertweet-base',
+    'vinai/bertweet-base',
+    'vinai/bertweet-base'
+  ]
+  voting_strategy: 'avg'

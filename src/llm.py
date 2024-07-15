@@ -9,6 +9,7 @@ from datasets import DatasetDict
 from transformers import (
     AutoTokenizer, AutoModel, DataCollatorWithPadding,
     Trainer, TrainingArguments, EarlyStoppingCallback,)
+from safetensors import safe_open
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
 import evaluate
@@ -109,8 +110,20 @@ class LLMClassifier():
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         precision = "fp16" if self.cfg.llm.use_fp16 else "fp32"
-        print(f"\n'{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.\n")
+        print(f"\n[+] '{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.\n")
 
+    def load_checkpoint(self, checkpoint_path: str):
+        """
+        Load a model checkpoint from a file.
+        :param checkpoint_path: Path to the model checkpoint file.
+        """
+        safetensor_file = os.path.join(checkpoint_path, "model.safetensors")
+        state_dict = {}
+        with safe_open(safetensor_file, framework="pt", device="cpu") as f:
+            for k in f.keys():
+                state_dict[k] = f.get_tensor(k)
+
+        self.model.load_state_dict(state_dict)
 
     def train(self, dataset: DatasetDict):
         """
@@ -149,11 +162,12 @@ class LLMClassifier():
         )
         trainer.train(resume_from_checkpoint=self.cfg.llm.resume_from_checkpoint)
 
-    def test(self, dataset: DatasetDict) -> np.ndarray:
+    def test(self, dataset: DatasetDict, hard_labels: bool = True) -> np.ndarray:
         """
         Run the model on the test dataset.
         :param dataset: Tokenized split datasets ready for the HF Trainer
-        :return: Test dataset output labels (-1 for negative, 1 for positive)
+        :param hard_labels: Return {-1, 1} labels if True, probability that label is 1 otherwise
+        :return: np.ndarray of shape (n_samples,) with test dataset labels.
         """
         self.model.to(self.device)
         self.model.eval()
@@ -165,9 +179,11 @@ class LLMClassifier():
             for batch in tqdm(loader, desc="Computing Submission"):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 outputs = self.model(**inputs)[0]
-                outputs = sigmoid(outputs).cpu().detach().numpy()
 
-                result = np.where(outputs >= THRESHOLD, 1, -1).reshape(-1, 1)
+                result = sigmoid(outputs).cpu().detach().numpy().reshape(-1, 1)
+                if hard_labels:
+                    result = np.where(result >= THRESHOLD, 1, -1)
+
                 results.append(result)
 
         return np.squeeze(np.vstack(results))
