@@ -110,7 +110,7 @@ class LLMClassifier():
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         precision = "fp16" if self.cfg.llm.use_fp16 else "fp32"
-        print(f"\n[+] '{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.\n")
+        print(f"[+] '{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.")
 
     def load_checkpoint(self, checkpoint_path: str):
         """
