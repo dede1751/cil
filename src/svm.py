@@ -4,6 +4,7 @@ from sklearn.metrics import classification_report
 from box import Box
 from datasets import Dataset
 import numpy as np 
+import time
 
 def preprocessor(tweet: str) -> str:
     return tweet.replace("<user>", "@USER")
@@ -32,11 +33,16 @@ if __name__ == "__main__":
 
     svm = SVMClassifier(cfg)
     twitter = TwitterDataset(cfg, preprocessor)
-    vectorizer = TfidfVectorizer(max_features=cfg.svm.max_features)
+    vectorizer = TfidfVectorizer(max_features=cfg.data.sparse_max_features)
 
     vectorized_dataset = twitter.vectorize(vectorizer)
 
+    print("Training...")
+    start = time.time()
     svm.train(vectorized_dataset["train"])
+    end = time.time()
+    print(f"Finished Training in {end - start} seconds.")
+    
     svm_outputs_validation = svm.test(vectorized_dataset["eval"])
 
     report_train = classification_report(vectorized_dataset["train"]["label"], svm.test(vectorized_dataset["train"]))

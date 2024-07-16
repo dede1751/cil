@@ -4,6 +4,7 @@ from sklearn.metrics import classification_report
 from box import Box
 from datasets import Dataset
 import numpy as np 
+import time
 
 def preprocessor(tweet: str) -> str:
     return tweet.replace("<user>", "@USER")
@@ -14,6 +15,7 @@ class RFClassifier:
         self.model = RandomForestClassifier(
             n_estimators=self.cfg.rf.n_estimators,
             max_depth=self.cfg.rf.max_depth, 
+            max_features=self.cfg.rf.max_features,
             random_state=self.cfg.general.seed)
     
     def train(self, train_data: Dataset) -> None: 
@@ -31,11 +33,16 @@ if __name__ == "__main__":
 
     logit = RFClassifier(cfg)
     twitter = TwitterDataset(cfg, preprocessor)
-    vectorizer = TfidfVectorizer(max_features=cfg.rf.max_features)
+    vectorizer = TfidfVectorizer(max_features=cfg.data.sparse_max_features)
 
     vectorized_dataset = twitter.vectorize(vectorizer)
 
+    print("Training...")
+    start = time.time()
     logit.train(vectorized_dataset["train"])
+    end = time.time()
+    print(f"Finished Training in {end - start} seconds.")
+
     logit_outputs_validation = logit.test(vectorized_dataset["eval"])
 
     report_train = classification_report(vectorized_dataset["train"]["label"], logit.test(vectorized_dataset["train"]))

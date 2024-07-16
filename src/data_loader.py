@@ -76,23 +76,23 @@ class TwitterDataset():
             'eval': Dataset.from_pandas(eval_df),
             'test': Dataset.from_pandas(test_df)})
 
-    def vectorize(self, vectorizer) -> DatasetDict:
+    def vectorize(self, vectorizer) -> dict[Dataset]:
         """
         Vectorize the dataset.
         :return: Vectorized split datasets.
         """        
         vectorizer = vectorizer.fit(self.dataset['train']['text'])
 
-        def vectorize_fn(examples):
-            matrix = vectorizer.transform(examples['text']).toarray()
-            return {'features': matrix.tolist()}
-
-        vectorized = self.dataset.map(vectorize_fn, batched=True)
-        vectorized["train"].set_format(type='numpy', columns=['features', 'label'])
-        vectorized["eval"].set_format(type='numpy', columns=['features', 'label'])
-        vectorized["test"].set_format(type='numpy', columns=['features'])
-
-        return vectorized
+        def vectorize_fn(dataset: Dataset) -> Dataset: 
+            processed = {'features': vectorizer.transform(dataset['text'])}
+            if 'label' in dataset.column_names:
+                processed['label'] = dataset['label']
+            return processed
+        
+        return dict({
+            split: vectorize_fn(self.dataset[split])
+            for split in self.dataset.keys()
+        })
 
     def tokenize_to_hf(
         self,

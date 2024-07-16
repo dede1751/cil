@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     logit = LogitClassifier(cfg)
     twitter = TwitterDataset(cfg, preprocessor)
-    vectorizer = TfidfVectorizer(max_features=cfg.logit.max_features)
+    vectorizer = TfidfVectorizer(max_features=cfg.data.sparse_max_features)
 
     vectorized_dataset = twitter.vectorize(vectorizer)
 
