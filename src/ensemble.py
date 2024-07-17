@@ -24,11 +24,17 @@ def test_model(
     config.llm.model = base_model
 
     twitter = TwitterDataset(config, preprocessor[config.llm.model])
+    twitter.dataset['train'] = twitter.dataset['train'].select([0]) # avoid tokenizing train data
+
     llm = LLMClassifier(config)
     llm.load_checkpoint(checkpoint_path)
 
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
-    return llm.test(tokenized_dataset[split], hard_labels=False)
+    outputs = llm.test(tokenized_dataset[split], hard_labels=False)
+
+    del twitter
+    del llm
+    return outputs
 
 
 def precompute_ensemble_eval(config: Box) -> np.ndarray:
