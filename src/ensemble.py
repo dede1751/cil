@@ -31,19 +31,26 @@ def test_model(
     return llm.test(tokenized_dataset[split], hard_labels=False)
 
 
-def precompute_ensemble_eval(file: str, config: Box) -> np.ndarray:
+def precompute_ensemble_eval(config: Box) -> np.ndarray:
     """
-    Compute the evaluation of the models on the validation set and save to a file.
+    Compute the evaluation of the models on the validation set.
+    Save model outputs and eval labels to files for further processing.
     :param config: Config object.
     """
+    config.data.dedup_strategy = None # We don't care about train data
+
     outputs = []
     for checkpoint, base_model in zip(config.ensemble.models, config.ensemble.base_models):
         print(f"[+] Evaluating model {checkpoint}")
         checkpoint_path = os.path.join(config.ensemble.path, checkpoint)
         outputs.append(test_model(checkpoint_path, base_model, "eval", config))
 
-    eval_labels = np.column_stack(outputs)
-    np.save(file, eval_labels)
+    eval_outputs = np.column_stack(outputs)
+    np.save("eval_outputs", eval_outputs)
+
+    twitter = TwitterDataset(config)
+    eval_labels = np.array(twitter.dataset["eval"]["label"])
+    np.save("eval_labels", eval_labels)
 
 
 if __name__ == "__main__":
@@ -52,7 +59,7 @@ if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
 
-    precompute_ensemble_eval("eval_labels.npy", cfg)
+    precompute_ensemble_eval(cfg)
 
     # cfg.data.max_samples = 1 # avoid loading training data
 
