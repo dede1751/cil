@@ -27,16 +27,23 @@ llm:
   weight_decay: 0.01
 
 ensemble:
+  path: 'ensemble/'
   models: [
-    'btwt-b-b32-e5-smooth/checkpoint-202515',
-    'btwt-b-b32-e5-soft/checkpoint-202515',
-    'btwt-b-b32-e5-hard/checkpoint-202515',
-    'btwt-b-b32-e5-none/checkpoint-222657'
+    'btwt-b-b32-e5-smooth',
+    'btwt-b-b32-e5-soft',
+    'btwt-b-b32-e5-hard',
+    'btwt-b-b32-e5-none',
+    'btwt-b-b32-e0-smooth',
+    'rbrt-b-b32-e5-smooth',
+    'rbrt-b-b32-e5-hard',
   ]
   base_models: [
     'vinai/bertweet-base',
     'vinai/bertweet-base',
     'vinai/bertweet-base',
-    'vinai/bertweet-base'
+    'vinai/bertweet-base',
+    'vinai/bertweet-base',
+    'cardiffnlp/twitter-roberta-base-sentiment-latest',
+    'cardiffnlp/twitter-roberta-base-sentiment-latest'
   ]
   voting_strategy: 'avg'

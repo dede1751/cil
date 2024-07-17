@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from datasets import DatasetDict
+from datasets import DatasetDict, Dataset
 from transformers import (
     AutoTokenizer, AutoModel, DataCollatorWithPadding,
     Trainer, TrainingArguments, EarlyStoppingCallback,)
@@ -18,9 +18,10 @@ import evaluate
 THRESHOLD = 0.5
 
 
-def preprocessor(tweet: str) -> str:
-    """Custom preprocessor for the Bertweet Tokenizer."""
-    return tweet.replace("<user>", "@USER").replace("<url>", "http")
+preprocessor = {
+    "vinai/bertweet-base": lambda tweet: tweet.replace("<user>", "@USER").replace("<url>", "http"),
+    "cardiffnlp/twitter-roberta-base-sentiment-latest": lambda tweet: tweet.replace("<user>", "@user").replace("<url>", "http"),
+}
 
 
 def compute_metrics(eval_pred):
@@ -162,7 +163,7 @@ class LLMClassifier():
         )
         trainer.train(resume_from_checkpoint=self.cfg.llm.resume_from_checkpoint)
 
-    def test(self, dataset: DatasetDict, hard_labels: bool = True) -> np.ndarray:
+    def test(self, dataset: Dataset, hard_labels: bool = True) -> np.ndarray:
         """
         Run the model on the test dataset.
         :param dataset: Tokenized split datasets ready for the HF Trainer
@@ -172,13 +173,14 @@ class LLMClassifier():
         self.model.to(self.device)
         self.model.eval()
 
-        loader = DataLoader(dataset["test"], batch_size=self.cfg.llm.batch_size, shuffle=False)
+        loader = DataLoader(dataset, batch_size=self.cfg.llm.batch_size, shuffle=False)
         results = []
         with torch.no_grad():
             sigmoid = nn.Sigmoid()
-            for batch in tqdm(loader, desc="Computing Submission"):
+            for batch in tqdm(loader, desc=f"Inference"):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
-                outputs = self.model(**inputs)[0]
+                outputs = self.model(
+                    input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])[0]
 
                 result = sigmoid(outputs).cpu().detach().numpy().reshape(-1, 1)
                 if hard_labels:
@@ -197,9 +199,9 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
-    twitter = TwitterDataset(cfg, preprocessor)
+    twitter = TwitterDataset(cfg, preprocessor[cfg.llm.model])
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     llm.train(tokenized_dataset)
 
-    llm_outputs = llm.test(tokenized_dataset)
+    llm_outputs = llm.test(tokenized_dataset["test"])
     save_outputs(llm_outputs, cfg.general.run_id)
