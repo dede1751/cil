@@ -20,6 +20,7 @@ THRESHOLD = 0.5
 
 preprocessor = {
     "vinai/bertweet-base": lambda tweet: tweet.replace("<user>", "@USER").replace("<url>", "http"),
+    "vinai/bertweet-large": lambda tweet: tweet.replace("<user>", "@USER").replace("<url>", "http"),
     "cardiffnlp/twitter-roberta-base-sentiment-latest": lambda tweet: tweet.replace("<user>", "@user").replace("<url>", "http"),
 }
 
