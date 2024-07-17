@@ -37,26 +37,37 @@ def test_model(
     return outputs
 
 
-def precompute_ensemble_eval(config: Box) -> np.ndarray:
+def test_all_models(split: str, config: Box) -> np.ndarray:
     """
-    Compute the evaluation of the models on the validation set.
-    Save model outputs and eval labels to files for further processing.
+    Compute the evaluation of all the ensemble models on the specified split.
     :param config: Config object.
+    :param split: Split to test the model on.
+    :return: np.ndarray of shape (n_samples, n_models) with the model outputs.
     """
     config.data.dedup_strategy = None # We don't care about train data
 
     outputs = []
     for checkpoint, base_model in zip(config.ensemble.models, config.ensemble.base_models):
-        print(f"[+] Evaluating model {checkpoint}")
+        print(f"\n[+] Evaluating model {checkpoint} on '{split}' set.")
         checkpoint_path = os.path.join(config.ensemble.path, checkpoint)
-        outputs.append(test_model(checkpoint_path, base_model, "eval", config))
+        outputs.append(test_model(checkpoint_path, base_model, split, config))
 
-    eval_outputs = np.column_stack(outputs)
-    np.save("eval_outputs", eval_outputs)
+    return np.column_stack(outputs)
 
+
+def precompute_ensemble_outputs(config: Box):
+    """
+    Compute and save to file the outputs for each ensemble model on the eval and test sets.
+    :param config: Config object.
+    """
     twitter = TwitterDataset(config)
     eval_labels = np.array(twitter.dataset["eval"]["label"])
-    np.save("eval_labels", eval_labels)
+    np.save(os.path.join(config.ensemble.path, "eval_labels"), eval_labels)
+
+    eval_outputs = test_all_models("eval", config)
+    test_outputs = test_all_models("test", config)
+    np.save(os.path.join(config.ensemble.path, "eval_outputs"), eval_outputs)
+    np.save(os.path.join(config.ensemble.path, "test_outputs"), test_outputs)
 
 
 if __name__ == "__main__":
@@ -65,7 +76,7 @@ if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
 
-    precompute_ensemble_eval(cfg)
+    precompute_ensemble_outputs(cfg)
 
     # cfg.data.max_samples = 1 # avoid loading training data
 
