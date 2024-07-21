@@ -25,3 +25,11 @@ llm:
   batch_size: 32
   gradient_accumulation_steps: 1
   weight_decay: 0.01
+
+bilstm:
+  resume_from_checkpoint: null
+  batch_size: 128
+  epochs: 40
+  embedding_dim: 10 
+  hidden_dim: 100
+  layers: 2
