@@ -1,13 +1,17 @@
 import os
 
 import numpy as np
-from utils import load_config, set_seed
+from utils import load_config, set_seed, save_outputs
 from data_loader import TwitterDataset
-from transformers import AutoTokenizer
-
+from transformers import DataCollatorWithPadding, AutoTokenizer
 import torch
 from torch import nn, optim
 from tqdm import tqdm
+import evaluate
+from torch.utils.data import DataLoader
+from llm import compute_metrics
+
+THRESHOLD = 0.5
 
 if torch.backends.mps.is_available():
     device = torch.device("mps")
@@ -22,15 +26,15 @@ class BiLSTM(nn.Module):
     def __init__(self, cfg, vocab_size):
         super(BiLSTM, self).__init__()
         self.vocab_size = vocab_size
-        self.num_layers = cfg.model.layers
-        self.hidden_size = cfg.model.hidden_dim
+        self.num_layers = cfg.bilstm.layers
+        self.hidden_size = cfg.bilstm.hidden_dim
 
         self.embedding = nn.Embedding(
             num_embeddings=self.vocab_size,
-            embedding_dim=cfg.model.embedding_dim,
+            embedding_dim=cfg.bilstm.embedding_dim,
         )
         self.lstm = nn.LSTM(
-            cfg.model.embedding_dim, 
+            cfg.bilstm.embedding_dim, 
             self.hidden_size, 
             self.num_layers, 
             batch_first=True, 
@@ -54,85 +58,68 @@ class BiLSTM(nn.Module):
 
         return out
 
-def process_predictions(y_pred, lower_bound=0.25, upper_bound=0.75):
-    """
-    Process the predictions to set values <0.25 to 0, >0.75 to 1, and sample in between.
-    
-    Args:
-    y_pred (torch.Tensor): The tensor of predictions between 0 and 1.
-    lower_bound (float): The lower bound for certain 0 prediction.
-    upper_bound (float): The upper bound for certain 1 prediction.
-    
-    Returns:
-    torch.Tensor: Processed binary predictions.
-    """
-    
-    # Convert the tensor to numpy array for sampling
-    y_pred_np = y_pred.cpu().numpy()
-    
-    # Initialize the output tensor
-    processed_preds = torch.zeros_like(y_pred)
-    
-    # Iterate over the predictions
-    for i in range(len(y_pred_np)):
-        if y_pred_np[i] < lower_bound:
-            processed_preds[i] = 0
-        elif y_pred_np[i] > upper_bound:
-            processed_preds[i] = 1
-        else:
-            processed_preds[i] = np.random.binomial(1, y_pred_np[i])
-    
-    return processed_preds
+    def run_test(self, test_dl):
+        # Evaluate the model on the val set
+        self.eval()  # Set the model to evaluation mode
+        predictions = np.array([])
+        with torch.no_grad():  # Disable gradient calculation for evaluation
+            with tqdm(enumerate(test_dl), total=len(test_dl), desc=f"Testing") as pbar:
+                for batch, x in pbar:
+                    x.to(device)
+                    y_pred = self(x.input_ids).view(-1)
+                    predicted = (y_pred > 0.5).float() 
+                    
+                    predictions = np.concatenate((predictions, predicted.cpu()))
 
-def eval(model, val_hf, epoch, num_epochs):
-    # Evaluate the model on the val set
-    model.eval()  # Set the model to evaluation mode
-    correct_predictions = 0
-    total_predictions = 0
-    with torch.no_grad():  # Disable gradient calculation for evaluation
-        with tqdm(enumerate(val_hf), total=len(val_hf), desc=f"Validation {epoch+1}/{num_epochs}") as pbar:
+        return predictions
+
+
+    def run_eval(self, val_dl, epoch, num_epochs):
+        # Evaluate the model on the val set
+        self.eval()  # Set the model to evaluation mode
+        predictions = np.array([])
+        labels = np.array([])
+        with torch.no_grad():  # Disable gradient calculation for evaluation
+            with tqdm(enumerate(val_dl), total=len(val_dl), desc=f"Validation {epoch+1}/{num_epochs}") as pbar:
+                for batch, x in pbar:
+                    x.to(device)
+                    y_pred = self(x.input_ids).view(-1)
+                    
+                    predictions = np.concatenate((predictions, y_pred.cpu()))
+                    labels = np.concatenate((labels, x.labels.cpu()))
+
+        # Calculate accuracy
+        metrics = compute_metrics((predictions, labels))
+        print(f"Epoch {epoch}/{num_epochs}, Val Accuracy: {metrics['accuracy']:.4f}, Val F1: {metrics['f1']:.4f}")
+        return metrics
+
+    def run_train(self, train_dl, optimizer, criterion, epoch, num_epochs):
+        # Initialize the progress bar for the current epoch
+        self.train()
+        with tqdm(enumerate(train_dl), total=len(train_dl), desc=f"Epoch {epoch}/{num_epochs}") as pbar:
             for batch, x in pbar:
                 x.to(device)
-                y_pred = model(x.input_ids).view(-1)
+                y_pred = self(x.input_ids).view(-1)
+                loss = criterion(y_pred, x.labels)
                 
-                # Calculate predictions
-                # predicted = process_predictions(y_pred, lower_bound=0.25, upper_bound=0.75)
-                predicted = (y_pred > 0.5).float() 
-                
-                correct_predictions += (predicted == x.labels).sum().item()
-                total_predictions += x.labels.size(0)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
-    # Calculate accuracy
-    accuracy = correct_predictions / total_predictions
-    print(f"Epoch {epoch+1}/{num_epochs}, Test Accuracy: {accuracy:.4f}")
-
-def train(model, train_hf, optimizer, criterion, epoch, num_epochs):
-    # Initialize the progress bar for the current epoch
-    model.train()
-    with tqdm(enumerate(train_hf), total=len(train_hf), desc=f"Epoch {epoch+1}/{num_epochs}") as pbar:
-        for batch, x in pbar:
-            x.to(device)
-            y_pred = model(x.input_ids).view(-1)
-            loss = criterion(y_pred, x.labels)
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            pbar.set_postfix({'loss': loss.item()})
+                pbar.set_postfix({'loss': loss.item()})
 
 if __name__ == "__main__":
     cfg = load_config()
     set_seed(cfg.general.seed)
-    dataset = TwitterDataset(cfg)
-    tokenizer = AutoTokenizer.from_pretrained(cfg.hf.model)
+
+    twitter = TwitterDataset(cfg)
+    tokenizer = AutoTokenizer.from_pretrained(cfg.llm.model)
+    tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
     
-    # new tokens
-    # new_tokens = ["<user>", "<url>"]
-    # new_tokens = set(new_tokens) - set(tokenizer.vocab.keys())
-    # tokenizer.add_tokens(list(new_tokens))
-    
-    train_hf, val_hf, test_hf = dataset.to_hf_dataloader(tokenizer)
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+    train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=cfg.bilstm.batch_size, collate_fn=data_collator)
+    eval_dl = DataLoader(tokenized_dataset['eval'], shuffle=True, batch_size=cfg.bilstm.batch_size, collate_fn=data_collator)
+    test_dl = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=cfg.bilstm.batch_size, collate_fn=data_collator)
 
     model = BiLSTM(cfg, len(tokenizer))
     model.to(device)
@@ -141,23 +128,35 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters())
     epoch_init = -1
 
-    if cfg.model.checkpoint_path:
-        checkpoint = torch.load(cfg.model.checkpoint_path, map_location=device)
+    if cfg.bilstm.resume_from_checkpoint:
+        checkpoint = torch.load(cfg.bilstm.resume_from_checkpoint, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch_init = checkpoint['epoch']
 
-    num_epochs = cfg.model.epochs
+    max_acc = 0
+    num_epochs = cfg.bilstm.epochs
     for epoch in range(epoch_init+1, num_epochs):
         # Train the model on the train set
-        train(model, train_hf, optimizer, criterion, epoch, num_epochs)
+        model.run_train(train_dl, optimizer, criterion, epoch, num_epochs)
 
         # Evaluate the model on the val set
-        eval(model, val_hf, epoch, num_epochs)
+        acc = model.run_eval(eval_dl, epoch, num_epochs)['accuracy']
 
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-        }, f"{cfg.model.out_path}/epoch_{epoch}.ckpt")
+        if acc >= max_acc:
+            max_acc = acc
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+            }, f"{cfg.data.checkpoint_path}/best.ckpt")
+            
+            outputs = model.run_test(test_dl)
+            save_outputs(outputs, cfg.general.run_id)
+    
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+    }, f"{cfg.data.checkpoint_path}/final.ckpt")
 
