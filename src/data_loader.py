@@ -117,6 +117,12 @@ class TwitterDataset():
 
         return tokenized
 
+    def tokenize(self, tokenize_fn):
+        tokenized = self.dataset.map(tokenize_fn, batched=True)
+        tokenized["train"].set_format(type='torch', columns=['input_ids', 'label'])
+        tokenized["eval"].set_format(type='torch', columns=['input_ids', 'label'])
+        tokenized["test"].set_format(type='torch', columns=['input_ids'])
+        return tokenized
 
 if __name__ == "__main__":
     from utils import load_config, set_seed
