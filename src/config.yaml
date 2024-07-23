@@ -26,8 +26,9 @@ llm:
   gradient_accumulation_steps: 1
   weight_decay: 0.01
 
-bilstm:
+lstm:
   resume_from_checkpoint: null
+  bidirectional: True
   batch_size: 128
   epochs: 40
   embedding_dim: 10 

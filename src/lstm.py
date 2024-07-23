@@ -22,35 +22,36 @@ else:
 print(f"Using device: {device}")
 
 # Create a bidirectional LSTM model class
-class BiLSTM(nn.Module):
+class LSTM(nn.Module):
     def __init__(self, cfg, vocab_size):
-        super(BiLSTM, self).__init__()
+        super(LSTM, self).__init__()
         self.vocab_size = vocab_size
-        self.num_layers = cfg.bilstm.layers
-        self.hidden_size = cfg.bilstm.hidden_dim
+        self.num_layers = cfg.lstm.layers
+        self.hidden_size = cfg.lstm.hidden_dim
 
         self.embedding = nn.Embedding(
             num_embeddings=self.vocab_size,
-            embedding_dim=cfg.bilstm.embedding_dim,
+            embedding_dim=cfg.lstm.embedding_dim,
         )
         self.lstm = nn.LSTM(
-            cfg.bilstm.embedding_dim, 
+            cfg.lstm.embedding_dim, 
             self.hidden_size, 
             self.num_layers, 
             batch_first=True, 
-            bidirectional=True,
+            bidirectional=cfg.lstm.bidirectional,
             dropout=0.3
         )
         self.fc = nn.Sequential(
-            nn.Linear(self.hidden_size * 2, 16),
+            nn.Linear(self.hidden_size * (2 if cfg.lstm.bidirectional else 1) , 16),
             nn.ReLU(),
             nn.Linear(16, 1),
             nn.Sigmoid()
         )
 
     def forward(self, x):
-        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(device)
-        c0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(device)
+        m = 2 if cfg.lstm.bidirectional else 1
+        h0 = torch.zeros(self.num_layers * m, x.size(0), self.hidden_size).to(device)
+        c0 = torch.zeros(self.num_layers * m, x.size(0), self.hidden_size).to(device)
 
         embeddings = self.embedding(x)
         out, _ = self.lstm(embeddings, (h0, c0))
@@ -117,25 +118,25 @@ if __name__ == "__main__":
     tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
     
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-    train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=cfg.bilstm.batch_size, collate_fn=data_collator)
-    eval_dl = DataLoader(tokenized_dataset['eval'], shuffle=True, batch_size=cfg.bilstm.batch_size, collate_fn=data_collator)
-    test_dl = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=cfg.bilstm.batch_size, collate_fn=data_collator)
+    train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=cfg.lstm.batch_size, collate_fn=data_collator)
+    eval_dl = DataLoader(tokenized_dataset['eval'], shuffle=True, batch_size=cfg.lstm.batch_size, collate_fn=data_collator)
+    test_dl = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=cfg.lstm.batch_size, collate_fn=data_collator)
 
-    model = BiLSTM(cfg, len(tokenizer))
+    model = LSTM(cfg, len(tokenizer))
     model.to(device)
 
     criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters())
     epoch_init = -1
 
-    if cfg.bilstm.resume_from_checkpoint:
-        checkpoint = torch.load(cfg.bilstm.resume_from_checkpoint, map_location=device)
+    if cfg.lstm.resume_from_checkpoint:
+        checkpoint = torch.load(cfg.lstm.resume_from_checkpoint, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch_init = checkpoint['epoch']
 
     max_acc = 0
-    num_epochs = cfg.bilstm.epochs
+    num_epochs = cfg.lstm.epochs
     for epoch in range(epoch_init+1, num_epochs):
         # Train the model on the train set
         model.run_train(train_dl, optimizer, criterion, epoch, num_epochs)
