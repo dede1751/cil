@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'ensemble_avg'
+  run_id: 'btwt-l-b32-e5-smooth'
 
 data:
   use_full_dataset: True
@@ -12,13 +12,13 @@ data:
   smoothing_epsilon: 0.01
 
 llm:
-  model: 'vinai/bertweet-base'
+  model: 'vinai/bertweet-large'
   resume_from_checkpoint: null
   use_fp16: False
   use_lora: False
   lora_r: 16
   lora_alpha: 32
-  max_len: 128
+  max_len: 64
   epochs: 3
   lr: 2.e-5
   warmup_steps: 500
@@ -46,4 +46,3 @@ ensemble:
     'cardiffnlp/twitter-roberta-base-sentiment-latest',
     'cardiffnlp/twitter-roberta-base-sentiment-latest'
   ]
-  voting_strategy: 'avg'

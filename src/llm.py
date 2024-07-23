@@ -178,7 +178,7 @@ class LLMClassifier():
         results = []
         with torch.no_grad():
             sigmoid = nn.Sigmoid()
-            for batch in tqdm(loader, desc=f"Inference"):
+            for batch in tqdm(loader, desc="Inference"):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
                 outputs = self.model(
                     input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])[0]

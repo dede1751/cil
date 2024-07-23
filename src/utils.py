@@ -28,6 +28,7 @@ def set_seed(seed: int):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
 
+
 def save_outputs(outputs: np.ndarray, file_name: str):
     """
     Save the model outputs to a file.
