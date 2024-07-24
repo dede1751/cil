@@ -64,3 +64,4 @@ tzdata==2024.1
 urllib3==2.2.2
 xxhash==3.4.1
 yarl==1.9.4
+isal==1.6.1
