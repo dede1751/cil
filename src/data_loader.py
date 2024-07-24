@@ -79,6 +79,7 @@ class TwitterDataset():
     def tokenize_to_hf(
         self,
         tokenizer: AutoTokenizer,
+        padding = 'max_length'
     ) -> DatasetDict:
         """
         Tokenize the dataset using a HuggingFace AutoTokenizer.
@@ -89,7 +90,7 @@ class TwitterDataset():
             return tokenizer(
                 examples['text'],
                 max_length=self.cfg.llm.max_len,
-                padding='max_length',
+                padding=padding,
                 truncation=True)
 
         tokenized = self.dataset.map(tokenize_fn, batched=True)
@@ -107,3 +108,40 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
     twitter = TwitterDataset(cfg)
     #tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))
+    
+    from tqdm import tqdm
+    from data_loader import TwitterDataset
+    from torch.utils.data import DataLoader
+    from transformers import DataCollatorWithPadding, AutoTokenizer
+    
+    tokenizer = AutoTokenizer.from_pretrained(cfg.llm.model)
+    tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
+    
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+    train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=1, collate_fn=data_collator)
+    eval_dl = DataLoader(tokenized_dataset['eval'], shuffle=True, batch_size=1, collate_fn=data_collator)
+    test_dl = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=1, collate_fn=data_collator)
+    
+    count = 0
+    max_len = 0
+    with tqdm(enumerate(train_dl), total=len(train_dl), desc=f"Train") as pbar:
+        for batch, x in pbar:
+            max_len = max(max_len, x['input_ids'].shape[1])
+            if len(x['input_ids'][0]) > 64: count += 1 
+            pbar.set_postfix({'Max len': max_len, 'Count': count})
+    
+    count = 0
+    max_len = 0
+    with tqdm(enumerate(eval_dl), total=len(eval_dl), desc=f"Eval") as pbar:
+        for batch, x in pbar:
+            max_len = max(max_len, x['input_ids'].shape[1])
+            if len(x['input_ids'][0]) > 64: count += 1 
+            pbar.set_postfix({'Max len': max_len, 'Count': count})
+
+    count = 0
+    max_len = 0
+    with tqdm(enumerate(test_dl), total=len(test_dl), desc=f"Test") as pbar:
+        for batch, x in pbar:
+            max_len = max(max_len, x['input_ids'].shape[1])
+            if len(x['input_ids'][0]) > 64: count += 1 
+            pbar.set_postfix({'Max len': max_len, 'Count': count})

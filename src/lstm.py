@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
     twitter = TwitterDataset(cfg)
     tokenizer = AutoTokenizer.from_pretrained(cfg.llm.model)
-    tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
+    tokenized_dataset = twitter.tokenize_to_hf(tokenizer, padding=False)
     
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=cfg.lstm.batch_size, collate_fn=data_collator)
