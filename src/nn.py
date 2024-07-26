@@ -168,9 +168,10 @@ if __name__ == "__main__":
     tokenized_dataset = twitter.tokenize(CustomTokenizer(embedding, tokenizer))
 
     model.train(tokenized_dataset["train"])
-    model_outputs = model.test(tokenized_dataset["eval"])
+    model_outputs_eval = model.test(tokenized_dataset["eval"])
+    model_outputs_test = model.test(tokenized_dataset["test"])
 
-    report = classification_report(tokenized_dataset["eval"]["label"], model_outputs)
+    report = classification_report(tokenized_dataset["eval"]["label"], model_outputs_eval)
     print("Eval report:", report)
-
-    save_outputs(np.where(model_outputs == 0, -1, 1), cfg.general.run_id)
+    
+    save_outputs(np.where(model_outputs_test == 0, -1, 1), cfg.general.run_id)

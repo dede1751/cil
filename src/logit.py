@@ -5,9 +5,6 @@ from box import Box
 from datasets import Dataset
 import numpy as np 
 
-def preprocessor(tweet: str) -> str:
-    return tweet.replace("<user>", "@USER")
-
 class LogitClassifier: 
     def __init__(self, config: Box): 
         self.cfg = config
@@ -29,7 +26,7 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     logit = LogitClassifier(cfg)
-    twitter = TwitterDataset(cfg, preprocessor)
+    twitter = TwitterDataset(cfg)
     vectorizer = TfidfVectorizer(max_features=cfg.data.sparse_max_features)
 
     vectorized_dataset = twitter.vectorize(vectorizer)
