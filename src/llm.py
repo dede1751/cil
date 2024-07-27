@@ -200,7 +200,6 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
-    print(llm.model)
     twitter = TwitterDataset(cfg, preprocessor[cfg.llm.model])
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     llm.train(tokenized_dataset)
