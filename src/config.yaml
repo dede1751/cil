@@ -30,20 +30,20 @@ ensemble:
   path: 'ensemble/'
   models:
     - name: 'btwt-b-b32-e5-smooth'
-      model: 'vinai/bertweet-base'
-      max_length: 128
+      base_model: 'vinai/bertweet-base'
+      max_len: 128
     - name: 'btwt-b-b64-e5-smooth'
-      model: 'vinai/bertweet-base'
-      max_length: 64
+      base_model: 'vinai/bertweet-base'
+      max_len: 64
     - name: 'btwt-b-b32-e5-soft'
-      model: 'vinai/bertweet-base'
-      max_length: 128
+      base_model: 'vinai/bertweet-base'
+      max_len: 128
     - name: 'btwt-b-b32-e5-none'
-      model: 'vinai/bertweet-base'
-      max_length: 128
+      base_model: 'vinai/bertweet-base'
+      max_len: 128
     - name: 'rbrt-b-b32-e5-smooth'
-      model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
-      max_length: 128
+      base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+      max_len: 128
     - name: 'rbrt-b-b32-e5-hard'
-      model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
-      max_length: 128
+      base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+      max_len: 128

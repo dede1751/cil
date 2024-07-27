@@ -40,15 +40,13 @@ def test_all_models(split: str, config: Box) -> np.ndarray:
     :param split: Split to test the model on.
     :return: np.ndarray of shape (n_samples, n_models) with the model outputs.
     """
-    config.data.dedup_strategy = None # We don't care about train data
-
     outputs = []
-    for checkpoint, base_model, max_len in config.ensemble.models:
-        checkpoint_path = os.path.join(config.ensemble.path, checkpoint)
-        config.llm.model = base_model
-        config.llm.max_len = max_len
+    for model in config.ensemble.models:
+        checkpoint_path = os.path.join(config.ensemble.path, model.name)
+        config.llm.model = model.base_model
+        config.llm.max_len = model.max_len
 
-        print(f"\n[+] Evaluating model {checkpoint} on '{split}' set.")
+        print(f"\n[+] Evaluating model {model.name} on '{split}' set.")
         outputs.append(test_model(checkpoint_path, split, config))
 
     return np.column_stack(outputs)
@@ -59,6 +57,8 @@ def precompute_ensemble_outputs(config: Box):
     Compute and save to file the outputs for each ensemble model on the eval and test sets.
     :param config: Config object.
     """
+    config.data.dedup_strategy = None # We don't care about train data
+
     twitter = TwitterDataset(config)
     eval_labels = np.array(twitter.dataset["eval"]["label"])
     np.save(os.path.join(config.ensemble.path, "eval_labels"), eval_labels)
