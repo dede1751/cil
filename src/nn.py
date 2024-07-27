@@ -11,7 +11,7 @@ def preprocessor(tweet: str) -> str:
     """Taken from https://nlp.stanford.edu/projects/glove/preprocess-twitter.rb"""
     import re
     
-    tweet = re.sub(r"[-+]?[.\d]*[\d]+[:,.\d]*", "<number>", tweet)
+    tweet = re.sub(r'[+-]?\d([:.,]?\d)*', " <number> ", tweet)
 
     def hashtag_split(match):
         hashtag_body = match.group(0)[1:]
@@ -44,8 +44,8 @@ class CustomTokenizer:
         self.embedding = embedding
         self.tokenizer = tokenizer
     
-    def __call__(self, data): 
-        input_ids = [self.embedding.get_token_id(self.tokenizer.tokenize(tweet)) for tweet in data['text']] 
+    def __call__(self, data):
+        input_ids = [self.embedding.get_tokens_id(self.tokenizer.tokenize(tweet)) for tweet in data['text']] 
         return {'input_ids' : input_ids}
 
 class CustomNeuralNetwork(nn.Module): 
@@ -65,7 +65,6 @@ class CustomNeuralNetwork(nn.Module):
         self.layers.append(nn.Dropout(self.cfg.nn.dropout_prob))
 
         self.layers.append(nn.Linear(self.cfg.nn.hidden_units, 1))
-        self.layers.append(nn.Sigmoid())
 
         self.layers = nn.Sequential(*self.layers)
 
@@ -102,7 +101,7 @@ class NNClassifier:
     def __init__(self, config, embedding): 
         self.cfg = config
         self.model = CustomNeuralNetwork(self.cfg, embedding)
-        self.criterion = nn.BCELoss()
+        self.criterion = nn.BCEWithLogitsLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.nn.lr)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -141,11 +140,11 @@ class NNClassifier:
             for input_ids in tqdm(data_loader, desc="Testing the NN..."): 
                 input_ids = input_ids.to(self.device)
 
-                outputs = self.model(input_ids)
+                outputs = torch.sigmoid(self.model(input_ids))
                 outputs = outputs.cpu().detach().numpy()   
 
-                result = np.where(outputs >= THRESHOLD, 1, 0).squeeze()
-                results.append(result)
+                #result = np.where(outputs >= THRESHOLD, 1, 0).squeeze()
+                results.append(outputs)
         return np.concatenate(results, axis=0)
     
 if __name__ == "__main__": 
@@ -171,7 +170,7 @@ if __name__ == "__main__":
     model_outputs_eval = model.test(tokenized_dataset["eval"])
     model_outputs_test = model.test(tokenized_dataset["test"])
 
-    report = classification_report(tokenized_dataset["eval"]["label"], model_outputs_eval)
-    print("Eval report:", report)
-    
-    save_outputs(np.where(model_outputs_test == 0, -1, 1), cfg.general.run_id)
+    val_report = classification_report(tokenized_dataset["eval"]["label"], np.where(model_outputs_eval > THRESHOLD, 1, 0).squeeze())
+    print("Eval report:", val_report)
+
+    save_outputs(np.where(model_outputs_test > THRESHOLD, 1, -1).squeeze(), cfg.general.run_id + '-formatted')
