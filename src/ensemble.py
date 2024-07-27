@@ -4,7 +4,7 @@ import numpy as np
 from box import Box
 
 from data_loader import TwitterDataset
-from llm import LLMClassifier, preprocessor, THRESHOLD
+from llm import LLMClassifier, preprocessor
 
 
 def test_model(
@@ -77,21 +77,3 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     precompute_ensemble_outputs(cfg)
-
-    # cfg.data.max_samples = 1 # avoid loading training data
-
-    # outputs = []
-    # for checkpoint, base_model in zip(cfg.ensemble.models, cfg.ensemble.base_models):
-    #     print(f"[+] Testing model {checkpoint}")
-    #     checkpoint_path = os.path.join(cfg.data.checkpoint_path, checkpoint)
-    #     outputs.append(test_model(checkpoint_path, base_model, "test", cfg))
-
-    # outputs = np.array(outputs)
-    # if cfg.ensemble.voting_strategy == "avg":
-    #     result = np.mean(outputs, axis=0)
-    #     result = np.where(result >= THRESHOLD, 1, -1)
-    # elif cfg.ensemble.voting_strategy == "vote":
-    #     result = np.where(outputs >= THRESHOLD, 1, -1)
-    #     result = np.where(np.sum(result, axis=0) >= 0, 1, -1)
-
-    # save_outputs(result, cfg.general.run_id)

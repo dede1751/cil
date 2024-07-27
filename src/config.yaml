@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'btwt-l-b32-e5-smooth'
+  run_id: 'ensemble-6'
 
 data:
   use_full_dataset: True
@@ -30,15 +30,13 @@ ensemble:
   path: 'ensemble/'
   models: [
     'btwt-b-b32-e5-smooth',
+    'btwt-b-b64-e5-smooth',
     'btwt-b-b32-e5-soft',
-    'btwt-b-b32-e5-hard',
     'btwt-b-b32-e5-none',
-    'btwt-b-b32-e0-smooth',
     'rbrt-b-b32-e5-smooth',
     'rbrt-b-b32-e5-hard',
   ]
   base_models: [
-    'vinai/bertweet-base',
     'vinai/bertweet-base',
     'vinai/bertweet-base',
     'vinai/bertweet-base',
