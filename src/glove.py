@@ -33,31 +33,46 @@ class GloveEmbedding:
             embedding_tensor, 
             padding_idx=0,
             freeze=self.cfg.embedding.freeze)
+
+class GloveTokenizer:
+    def __init__(self, embedding, tokenizer): 
+        self.embedding = embedding
+        self.tokenizer = tokenizer
     
-if __name__ == "__main__": 
-    from nltk import TweetTokenizer
+    def __call__(self, data):
+        input_ids = [self.embedding.get_tokens_id(self.tokenizer.tokenize(tweet)) for tweet in data['text']] 
+        return {'input_ids' : input_ids}
 
-    tweet = "<user> shucks well i work all week so now i can't come cheer you on ! oh and put those batteries in your calculator ! ! !"
-    cfg = Box({
-        "embedding": {
-            "folder": "pretrained_embeddings",
-            "name": "glove",
-            "dim": 200,
-            "freeze": True
-        },
-        "data": {
-            "max_length": 128
-        }
-    })
+def preprocessor(tweet: str) -> str:
+    """Taken from https://nlp.stanford.edu/projects/glove/preprocess-twitter.rb"""
+    import re
+    import wordsegment
+    
+    tweet = re.sub(r'[+-]?\d([:.,]?\d)*', " <number> ", tweet)
 
-    print("tweet:", tweet)
+    def hashtag_split(match):
+        hashtag_body = match.group(0)[1:]
+        new_body = hashtag_body
+        try:
+            new_body = " ".join(wordsegment.segment(hashtag_body))
+        finally:
+            if hashtag_body.upper() == hashtag_body:   
+                new_body += "<allcaps>"
+            return f"<hashtag> {new_body}"
+    
+    tweet = re.sub(r"#\S+", hashtag_split, tweet)
+    
+    # Replace sequences of "!" with "! <repeat>"
+    tweet = re.sub(r"(?:\s*!){2,}", r" ! <repeat>", tweet)
+    # Replace sequences of "?" with "? <repeat>"
+    tweet = re.sub(r"(?:\s*\?){2,}", r"? <repeat>", tweet)
+    # Replace sequences of "." with ". <repeat>"
+    tweet = re.sub(r"(?:\s*\.){2,}", r" . <repeat>", tweet)
+    
+    # Replace elongated words with "<elong>"
+    tweet = re.sub(r"\b(\S*?)(.)\2{2,}\b", r"\1\2 <elong>", tweet)
+    # Replace all-caps words with "<allcaps>"
+    tweet = re.sub(r"\b([A-Z]{2,})\b", lambda m: f"{m.group(0).lower()} <allcaps>", tweet)
 
-    glove = GloveEmbedding(cfg)
-    tokenizer = TweetTokenizer()
-
-    tokens = tokenizer.tokenize(tweet)
-    print("tokens:", tokens)
-
-    token_ids = glove.get_token_id(tokens)  
-    print("token_ids:", token_ids)  
+    return tweet.lower()
 

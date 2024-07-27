@@ -143,8 +143,8 @@ class NNClassifier:
                 outputs = torch.sigmoid(self.model(input_ids))
                 outputs = outputs.cpu().detach().numpy()   
 
-                #result = np.where(outputs >= THRESHOLD, 1, 0).squeeze()
-                results.append(outputs)
+                result = np.where(outputs > THRESHOLD, 1, 0).squeeze()
+                results.append(result)
         return np.concatenate(results, axis=0)
     
 if __name__ == "__main__": 
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     model_outputs_eval = model.test(tokenized_dataset["eval"])
     model_outputs_test = model.test(tokenized_dataset["test"])
 
-    val_report = classification_report(tokenized_dataset["eval"]["label"], np.where(model_outputs_eval > THRESHOLD, 1, 0).squeeze())
+    val_report = classification_report(tokenized_dataset["eval"]["label"], model_outputs_eval)
     print("Eval report:", val_report)
 
-    save_outputs(np.where(model_outputs_test > THRESHOLD, 1, -1).squeeze(), cfg.general.run_id + '-formatted')
+    save_outputs(np.where(model_outputs_test > THRESHOLD, 1, -1).squeeze(), cfg.general.run_id)
