@@ -101,10 +101,10 @@ class LLMClassifier():
                 r=self.cfg.llm.lora_r,
                 lora_alpha=self.cfg.llm.lora_alpha,
                 use_rslora=True,
-                target_modules=["query", "value"],
+                target_modules=["query", "value", "key", "dense"],
                 lora_dropout=0.1,
                 bias="none",
-                modules_to_save=["classifier"],
+                modules_to_save=["classifier", "classifier_dropout"],
                 task_type=TaskType.SEQ_CLS,
             )
 
@@ -200,6 +200,7 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
+    print(llm.model)
     twitter = TwitterDataset(cfg, preprocessor[cfg.llm.model])
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     llm.train(tokenized_dataset)

@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'ensemble-6'
+  run_id: 'btwt-l-lora16-b32-e5-smooth'
 
 data:
   use_full_dataset: True
@@ -15,9 +15,9 @@ llm:
   model: 'vinai/bertweet-large'
   resume_from_checkpoint: null
   use_fp16: False
-  use_lora: False
+  use_lora: True
   lora_r: 16
-  lora_alpha: 32
+  lora_alpha: 16
   max_len: 64
   epochs: 3
   lr: 2.e-5
