@@ -9,20 +9,16 @@ from llm import LLMClassifier, preprocessor
 
 def test_model(
     checkpoint_path: str,
-    base_model: str,
     split: str,
     config: Box
 ) -> np.ndarray:
     """
     Test the model on the given dataset.
     :param checkpoint_path: Path to the model checkpoint.
-    :param base_model: Base model name.
     :param split: Split to test the model on.
     :param config: Config object.
     :return: np.ndarray of shape (n_samples,) with test dataset labels.
     """
-    config.llm.model = base_model
-
     twitter = TwitterDataset(config, preprocessor[config.llm.model])
     twitter.dataset['train'] = twitter.dataset['train'].select([0]) # avoid tokenizing train data
 
@@ -47,10 +43,13 @@ def test_all_models(split: str, config: Box) -> np.ndarray:
     config.data.dedup_strategy = None # We don't care about train data
 
     outputs = []
-    for checkpoint, base_model in zip(config.ensemble.models, config.ensemble.base_models):
-        print(f"\n[+] Evaluating model {checkpoint} on '{split}' set.")
+    for checkpoint, base_model, max_len in config.ensemble.models:
         checkpoint_path = os.path.join(config.ensemble.path, checkpoint)
-        outputs.append(test_model(checkpoint_path, base_model, split, config))
+        config.llm.model = base_model
+        config.llm.max_len = max_len
+
+        print(f"\n[+] Evaluating model {checkpoint} on '{split}' set.")
+        outputs.append(test_model(checkpoint_path, split, config))
 
     return np.column_stack(outputs)
 
