@@ -44,9 +44,10 @@ class CustomRobertaForSequenceClassification(nn.Module):
 
     def __init__(self, original_model):
         super(CustomRobertaForSequenceClassification, self).__init__()
+        self.config = original_model.config
         self.roberta = original_model
-        self.classifier_dropout = nn.Dropout(original_model.config.hidden_dropout_prob)
-        self.classifier = nn.Linear(original_model.config.hidden_size, 1)
+        self.classifier_dropout = nn.Dropout(self.config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.config.hidden_size, 1)
 
     def forward(
         self,
@@ -58,7 +59,8 @@ class CustomRobertaForSequenceClassification(nn.Module):
         inputs_embeds=None,
         labels=None,
         output_attentions=None,
-        output_hidden_states=None
+        output_hidden_states=None,
+        return_dict=None,
     ):
         outputs = self.roberta(
             input_ids,
