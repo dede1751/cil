@@ -3,6 +3,7 @@ import glove
 import nltk
 import numpy as np
 import torch
+import time
 
 from utils import load_config, set_seed, save_outputs, compute_metrics, THRESHOLD
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     if cfg.baselines.model == "logit":
         model = logit.LogitClassifier(cfg)
     elif cfg.baselines.model == "rf": 
-        model = rf.RandomForestClassifier(cfg)
+        model = rf.RFClassifier(cfg)
     elif cfg.baselines.model == "svm": 
         model = svm.SVMClassifier(cfg)
     elif cfg.baselines.model == "nn": 
@@ -55,7 +56,11 @@ if __name__ == "__main__":
     else: 
         raise NotImplementedError
     
+    print("Training...")
+    start = time.time()
     model.train(dataset["train"])
+    end = time.time()
+    print(f"Finished Training in {end - start} seconds.")
     
     eval_outputs = model.test(dataset["eval"])
     eval_true = dataset["eval"]["label"]
