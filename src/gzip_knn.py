@@ -43,20 +43,19 @@ class gzipKNN:
         """
         predictions = []
         training_labels = np.array(training_texts["label"])
+        compressed_train =  [(x2["text"],self._compress_length(x2["text"])) for x2 in training_texts]
+        i = 0
         for x1 in test_texts:
-            print(x1)
-            print("\n\n\n")
+            if i % 100 == 0:
+                print(f"{i}%")
+                i+=1
             x1 = x1["text"]
             Cx1 = self._compress_length(x1)
             
             distances = []
 
-            for x2 in training_texts:
+            for x2, Cx2 in compressed_train:
 
-                x2 = x2["text"]
-                
-                Cx2 = self._compress_length(x2)
-            
                 x1x2 = " ".join([x1, x2])
                 Cx1x2 = self._compress_length(x1x2)
                 ncd = (Cx1x2 - min(Cx1, Cx2)) / max(Cx1, Cx2)
@@ -83,20 +82,17 @@ if __name__ == "__main__":
     
     dataset = twitter._load_dataset()
     
-    train = dataset["train"]
+    train = dataset["train"].select(range(0,2000000,2000))
     
-    test = dataset["test"]
-
-    test = test.select(range(10))
-    # train = train.select(range(100))
+    test = dataset["test"].select(range(0,10000))
     
     model = gzipKNN()
     
     predictions = model.predict(test, train)
     
-    print(predictions)
     
+    print("shape: " predictions.shape)
     predictions = np.where(predictions == 0, -1, 1)
-    save_outputs(predictions, cfg.general.run_id)
+    save_outputs(np.array(predictions), cfg.general.run_id)
 
     
