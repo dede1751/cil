@@ -16,7 +16,8 @@ class RFClassifier:
             n_estimators=self.cfg.rf.n_estimators,
             max_depth=self.cfg.rf.max_depth, 
             max_features=self.cfg.rf.max_features,
-            random_state=self.cfg.general.seed)
+            random_state=self.cfg.general.seed,
+            n_jobs=-1)
     
     def train(self, train_data: Dataset) -> None: 
         self.model.fit(train_data["features"], train_data["label"])

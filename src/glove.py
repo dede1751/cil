@@ -1,8 +1,8 @@
 from box import Box
 import numpy as np
+import pandas as pd
 import torch 
 import torch.nn as nn
-import codecs
 
 class GloveEmbedding: 
     def __init__(self, cfg: Box): 
@@ -14,24 +14,16 @@ class GloveEmbedding:
         idx = 1
         self.vocab = {}
         self.embeddings = [np.zeros(self.cfg.embedding.dim, dtype=np.float32)]
-        with codecs.open(path, 'r', encoding='utf-8', errors='ignore') as f:
-            for line in f:
-                values = line.split()
-                if len(values) >= 1:
-                    word = values[0]
-                    try:
-                        vector = np.array(values[1:], dtype=np.float32)
-                        if vector.shape[0] == self.cfg.embedding.dim:  # Ensure correct dimension
-                            self.vocab[word] = idx
-                            self.embeddings.append(vector)
-                            idx += 1
-                        else:
-                            print(f"Skipping line with incorrect dimensions: {line[:50]}...")
-                    except ValueError as e:
-                        print(f"Skipping line due to parsing error: {line[:50]}... Error: {e}")
+
+        df = pd.read_csv(path, sep=" ", quoting=3, header=None, index_col=0, dtype={0: str})
+
+        for word, vector in df.iterrows():
+            self.vocab[word] = idx
+            self.embeddings.append(vector.values.astype(np.float32))
+            idx += 1
     
-    def get_token_id(self, tokens: list[str]) -> list[np.ndarray]:
-        token_ids = [self.vocab[token] if token in self.vocab else self.vocab[self.unknown_token] for token in tokens]
+    def get_tokens_id(self, tokens: list[str]) -> list[np.ndarray]:
+        token_ids = [self.vocab.get(token, self.vocab[self.unknown_token]) for token in tokens]
         token_ids += [0] * (self.cfg.data.max_length - len(token_ids))
         return token_ids
     
@@ -41,3 +33,46 @@ class GloveEmbedding:
             embedding_tensor, 
             padding_idx=0,
             freeze=self.cfg.embedding.freeze)
+
+class GloveTokenizer:
+    def __init__(self, embedding, tokenizer): 
+        self.embedding = embedding
+        self.tokenizer = tokenizer
+    
+    def __call__(self, data):
+        input_ids = [self.embedding.get_tokens_id(self.tokenizer.tokenize(tweet)) for tweet in data['text']] 
+        return {'input_ids' : input_ids}
+
+def preprocessor(tweet: str) -> str:
+    """Taken from https://nlp.stanford.edu/projects/glove/preprocess-twitter.rb"""
+    import re
+    import wordsegment
+    
+    tweet = re.sub(r'[+-]?\d([:.,]?\d)*', " <number> ", tweet)
+
+    def hashtag_split(match):
+        hashtag_body = match.group(0)[1:]
+        new_body = hashtag_body
+        try:
+            new_body = " ".join(wordsegment.segment(hashtag_body))
+        finally:
+            if hashtag_body.upper() == hashtag_body:   
+                new_body += "<allcaps>"
+            return f"<hashtag> {new_body}"
+    
+    tweet = re.sub(r"#\S+", hashtag_split, tweet)
+    
+    # Replace sequences of "!" with "! <repeat>"
+    tweet = re.sub(r"(?:\s*!){2,}", r" ! <repeat>", tweet)
+    # Replace sequences of "?" with "? <repeat>"
+    tweet = re.sub(r"(?:\s*\?){2,}", r"? <repeat>", tweet)
+    # Replace sequences of "." with ". <repeat>"
+    tweet = re.sub(r"(?:\s*\.){2,}", r" . <repeat>", tweet)
+    
+    # Replace elongated words with "<elong>"
+    tweet = re.sub(r"\b(\S*?)(.)\2{2,}\b", r"\1\2 <elong>", tweet)
+    # Replace all-caps words with "<allcaps>"
+    tweet = re.sub(r"\b([A-Z]{2,})\b", lambda m: f"{m.group(0).lower()} <allcaps>", tweet)
+
+    return tweet.lower()
+
