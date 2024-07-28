@@ -66,4 +66,9 @@ if __name__ == "__main__":
     print(f"Recall: {recall_score(eval_true, eval_outputs)}")
     
     test_outputs = model.test(dataset["test"])
-    save_outputs(np.where(test_outputs > THRESHOLD, 1, -1), cfg.general.run_id)
+    if cfg.baselines.model in ["logit", "rf", "svm"]: 
+        test_outputs = np.where(test_outputs == 0, -1, 1)
+    else:
+        test_outputs = np.where(test_outputs > THRESHOLD, 1, -1)
+
+    save_outputs(test_outputs, cfg.general.run_id)
