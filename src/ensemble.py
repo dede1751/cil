@@ -4,7 +4,7 @@ import numpy as np
 from box import Box
 
 from data_loader import TwitterDataset
-from llm import LLMClassifier, preprocessor
+from llm import LLMClassifier, preprocessor, THRESHOLD
 
 
 def test_model(
@@ -23,7 +23,7 @@ def test_model(
     twitter.dataset['train'] = twitter.dataset['train'].select([0]) # avoid tokenizing train data
 
     llm = LLMClassifier(config)
-    llm.load_checkpoint(checkpoint_path)
+    llm.load_checkpoint(checkpoint_path, config.llm.use_lora)
 
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     outputs = llm.test(tokenized_dataset[split], hard_labels=False)
@@ -70,6 +70,10 @@ def precompute_ensemble_outputs(config: Box):
     test_outputs = test_all_models("test", config)
     np.save(os.path.join(config.ensemble.path, "eval_outputs"), eval_outputs)
     np.save(os.path.join(config.ensemble.path, "test_outputs"), test_outputs)
+
+    eval_predictions = np.where(eval_outputs >= THRESHOLD, 1, 0)
+    accuracy = np.mean(eval_predictions == eval_labels)
+    print(f"\n[+] Evaluation accuracy: {accuracy:.3%}")
 
 
 if __name__ == "__main__":

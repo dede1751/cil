@@ -29,6 +29,10 @@ llm:
 ensemble:
   path: 'ensemble/'
   models:
+    - name: 'btwt-l-lora16-b32-e5-smooth'
+      base_model: 'vinai/bertweet-large'
+      max_len: 64
+      lora_r: 16
     - name: 'btwt-b-b32-e5-smooth'
       base_model: 'vinai/bertweet-base'
       max_len: 128
@@ -41,10 +45,6 @@ ensemble:
       base_model: 'vinai/bertweet-base'
       max_len: 128
       lora_r: null
-    - name: 'btwt-l-lora16-b32-e5-smooth'
-      base_model: 'vinai/bertweet-large'
-      max_len: 64
-      lora_r: 16
     - name: 'rbrt-b-b32-e5-smooth'
       base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
       max_len: 128

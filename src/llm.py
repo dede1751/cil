@@ -115,19 +115,26 @@ class LLMClassifier():
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         precision = "fp16" if self.cfg.llm.use_fp16 else "fp32"
-        print(f"[+] '{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.")
+        print(
+            f"[+] '{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.")
 
-    def load_checkpoint(self, checkpoint_path: str):
+    def load_checkpoint(self, path: str, adapter: bool = False):
         """
-        Load a model checkpoint from a file.
-        :param checkpoint_path: Path to the model checkpoint file.
+        Load a model checkpoint from a 'model.safetensors' file.
+        If 'adapter' is set to True, will instead laod 'adapter_config.json' and
+        'adapter_model.safetensors' in the path directory.
+        :param path: Path to the model files.
+        :param adapter: Load the model with an adapter instead of the full state_dict.
         """
-        safetensor_file = os.path.join(checkpoint_path, "model.safetensors")
+        if adapter:
+            self.model.load_adapter(path, adapter_name="lora")
+            return
+
+        safetensor_file = os.path.join(path, "model.safetensors")
         state_dict = {}
         with safe_open(safetensor_file, framework="pt", device="cpu") as f:
             for k in f.keys():
                 state_dict[k] = f.get_tensor(k)
-
         self.model.load_state_dict(state_dict)
 
     def train(self, dataset: DatasetDict):
