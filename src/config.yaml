@@ -30,7 +30,7 @@ lstm:
   resume_from_checkpoint: null
   bidirectional: True
   batch_size: 128
-  epochs: 40
-  embedding_dim: 10 
-  hidden_dim: 100
-  layers: 2
+  epochs: 60
+  embedding_dim: 128 
+  hidden_dim: 512
+  layers: 3
