@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'btwt-l-lora16-b32-e5-smooth'
+  run_id: 'rbrt-l-lora16-b32-e5-smooth'
 
 data:
   use_full_dataset: True
@@ -12,7 +12,7 @@ data:
   smoothing_epsilon: 0.01
 
 llm:
-  model: 'vinai/bertweet-large'
+  model: 'cardiffnlp/twitter-roberta-large-2022-154m'
   resume_from_checkpoint: null
   use_fp16: False
   use_lora: True
