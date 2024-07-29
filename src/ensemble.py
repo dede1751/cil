@@ -45,6 +45,9 @@ def test_all_models(split: str, config: Box) -> np.ndarray:
         checkpoint_path = os.path.join(config.ensemble.path, model.name)
         config.llm.model = model.base_model
         config.llm.max_len = model.max_len
+        config.llm.use_lora = model.lora_r is not None
+        config.llm.lora_r = model.lora_r
+        config.llm.lora_alpha = model.lora_r
 
         print(f"\n[+] Evaluating model {model.name} on '{split}' set.")
         outputs.append(test_model(checkpoint_path, split, config))
