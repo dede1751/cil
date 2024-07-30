@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'ensemble-6'
+  run_id: 'nn'
 
 data:
   use_full_dataset: True
@@ -8,8 +8,10 @@ data:
   eval_split: 0.05
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
-  dedup_strategy: 'smooth'
+  dedup_strategy: 'hard'
   smoothing_epsilon: 0.01
+  sparse_max_features: 1000
+  max_length: 128
 
 llm:
   model: 'cardiffnlp/twitter-roberta-large-2022-154m'
@@ -53,3 +55,30 @@ ensemble:
       base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
       max_len: 128
       lora_r: null
+
+logit: 
+  max_iter: 1000
+
+rf:
+  n_estimators: 100
+  max_depth: 50
+  max_features: 50
+
+svm: 
+  kernel: 'rbf'
+  class_weight: 'balanced'
+  C: 1.0
+
+embedding:
+  name: 'glove'
+  folder: 'pretrained_embeddings'
+  dim: 200
+  freeze: True
+
+nn: 
+  hidden_layers: 3
+  hidden_units: 128
+  dropout_prob: 0.0
+  lr: 1.e-4
+  epochs: 100
+  batch_size: 32

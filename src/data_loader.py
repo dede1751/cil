@@ -1,5 +1,5 @@
 import os
-from typing import Callable
+from typing import Callable, Dict
 
 from datasets import DatasetDict, Dataset
 import pandas as pd
@@ -75,6 +75,24 @@ class TwitterDataset():
             'eval': Dataset.from_pandas(eval_df),
             'test': Dataset.from_pandas(test_df)})
 
+    def vectorize(self, vectorizer) -> Dict[Dataset]:
+        """
+        Vectorize the dataset.
+        :return: Vectorized split datasets.
+        """
+        vectorizer = vectorizer.fit(self.dataset['train']['text'])
+
+        def vectorize_fn(dataset: Dataset) -> Dataset: 
+            processed = {'features': vectorizer.transform(dataset['text'])}
+            if 'label' in dataset.column_names:
+                processed['label'] = dataset['label']
+            return processed
+
+        return dict({
+            split: vectorize_fn(self.dataset[split])
+            for split in self.dataset.keys()
+        })
+
     def tokenize_to_hf(
         self,
         tokenizer: AutoTokenizer,
@@ -99,6 +117,12 @@ class TwitterDataset():
 
         return tokenized
 
+    def tokenize(self, tokenize_fn):
+        tokenized = self.dataset.map(tokenize_fn, batched=True)
+        tokenized["train"].set_format(type='torch', columns=['input_ids', 'label'])
+        tokenized["eval"].set_format(type='torch', columns=['input_ids', 'label'])
+        tokenized["test"].set_format(type='torch', columns=['input_ids'])
+        return tokenized
 
 if __name__ == "__main__":
     from utils import load_config, set_seed
