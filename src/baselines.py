@@ -5,12 +5,12 @@ import numpy as np
 import torch
 import time
 
-from utils import load_config, set_seed, save_outputs, compute_metrics, THRESHOLD
+from utils import load_config, set_seed, save_outputs
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from data_loader import TwitterDataset
 
-import logit, rf, svm, nn
+import logit, rf, svm
 
 if __name__ == "__main__":
     cfg = load_config()
@@ -34,14 +34,13 @@ if __name__ == "__main__":
         tokenizer = glove.GloveTokenizer(embedding, nltk.TweetTokenizer())
         dataset = twitter.tokenize(tokenizer)
 
-        if cfg.baselines.model in ["logit", "rf", "svm"]: 
-            emebdding_matrix = embedding.get_embedding()
-            dataset = dataset.map(lambda x: 
-                        {"features": [torch.mean(emebdding_matrix(input_ids), axis=0).squeeze() for input_ids in x["input_ids"]]}, 
-                        batched=True)
-            dataset["train"].set_format(type='numpy', columns=['features', 'label'])
-            dataset["eval"].set_format(type='numpy', columns=['features', 'label'])
-            dataset["test"].set_format(type='numpy', columns=['features'])
+        emebdding_matrix = embedding.get_embedding()
+        dataset = dataset.map(lambda x: 
+                    {"features": [torch.mean(emebdding_matrix(input_ids), axis=0).squeeze() for input_ids in x["input_ids"]]}, 
+                    batched=True)
+        dataset["train"].set_format(type='numpy', columns=['features', 'label'])
+        dataset["eval"].set_format(type='numpy', columns=['features', 'label'])
+        dataset["test"].set_format(type='numpy', columns=['features'])
     else:
         raise NotImplementedError
 
@@ -51,8 +50,6 @@ if __name__ == "__main__":
         model = rf.RFClassifier(cfg)
     elif cfg.baselines.model == "svm": 
         model = svm.SVMClassifier(cfg)
-    elif cfg.baselines.model == "nn": 
-        model = nn.NNClassifier(cfg, embedding)
     else: 
         raise NotImplementedError
     
@@ -71,9 +68,6 @@ if __name__ == "__main__":
     print(f"Recall: {recall_score(eval_true, eval_outputs)}")
     
     test_outputs = model.test(dataset["test"])
-    if cfg.baselines.model in ["logit", "rf", "svm"]: 
-        test_outputs = np.where(test_outputs == 0, -1, 1)
-    else:
-        test_outputs = np.where(test_outputs > THRESHOLD, 1, -1)
+    test_outputs = np.where(test_outputs == 0, -1, 1)
 
     save_outputs(test_outputs, cfg.general.run_id)

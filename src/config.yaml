@@ -91,3 +91,7 @@ ensemble:
       base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
       max_len: 128
       lora_r: null
+
+baselines: 
+  model: "rf"
+  data: "tfidf"
