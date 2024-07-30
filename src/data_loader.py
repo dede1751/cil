@@ -1,5 +1,5 @@
 import os
-from typing import Callable
+from typing import Callable, Dict
 
 from datasets import DatasetDict, Dataset
 import pandas as pd
@@ -21,14 +21,13 @@ class TwitterDataset():
         self.dataset = self._load_dataset()
         for split in self.dataset:
             print(f"Number of rows in '{split}' dataset: {self.dataset[split].num_rows}")
-        print("\n")
 
-    def _read_data(self, file: str) -> pd.DataFrame:
+    def _read_data(self, file: str, max_samples: int = None) -> pd.DataFrame:
         file_path = os.path.join(self.cfg.data.path, file)
         with open(file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
-        tweets = [line.strip() for line in lines[:self.cfg.data.max_samples]]
+        tweets = [line.strip() for line in lines[:max_samples]]
         if self.preprocessor is not None:
             tweets = [self.preprocessor(tweet) for tweet in tweets]
 
@@ -36,11 +35,11 @@ class TwitterDataset():
 
     def _load_dataset(self):
         if self.cfg.data.use_full_dataset:
-            train_neg = self._read_data("train_neg_full.txt")
-            train_pos = self._read_data("train_pos_full.txt")
+            train_neg = self._read_data("train_neg_full.txt", self.cfg.data.max_samples)
+            train_pos = self._read_data("train_pos_full.txt", self.cfg.data.max_samples)
         else:
-            train_neg = self._read_data("train_neg.txt")
-            train_pos = self._read_data("train_pos.txt")
+            train_neg = self._read_data("train_neg.txt", self.cfg.data.max_samples)
+            train_pos = self._read_data("train_pos.txt", self.cfg.data.max_samples)
 
         train_neg['label'] = 0.0
         train_pos['label'] = 1.0
@@ -67,7 +66,7 @@ class TwitterDataset():
             train_df = train_df.groupby('text', as_index=False).mean()
             train_df['label'] = train_df['label'].apply(lambda x: x * (1 - epsilon) + 0.5 * epsilon)
 
-        print(f"Removed {old_rows - train_df.shape[0]} duplicates.")
+        print(f"[+] Removed {old_rows - train_df.shape[0]} duplicates.")
         train_df = train_df.reset_index(drop=True)
         eval_df = eval_df.reset_index(drop=True)
 
@@ -75,6 +74,24 @@ class TwitterDataset():
             {'train': Dataset.from_pandas(train_df),
             'eval': Dataset.from_pandas(eval_df),
             'test': Dataset.from_pandas(test_df)})
+
+    def vectorize(self, vectorizer) -> Dict[Dataset]:
+        """
+        Vectorize the dataset.
+        :return: Vectorized split datasets.
+        """
+        vectorizer = vectorizer.fit(self.dataset['train']['text'])
+
+        def vectorize_fn(dataset: Dataset) -> Dataset: 
+            processed = {'features': vectorizer.transform(dataset['text'])}
+            if 'label' in dataset.column_names:
+                processed['label'] = dataset['label']
+            return processed
+
+        return dict({
+            split: vectorize_fn(self.dataset[split])
+            for split in self.dataset.keys()
+        })
 
     def tokenize_to_hf(
         self,
@@ -93,6 +110,7 @@ class TwitterDataset():
                 padding=padding,
                 truncation=True)
 
+        print(f"[+] Tokenizing the dataset using {tokenizer.__class__.__name__}.")
         tokenized = self.dataset.map(tokenize_fn, batched=True)
         tokenized["train"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
         tokenized["eval"].set_format(type='torch', columns=['input_ids', 'attention_mask', 'label'])
@@ -100,39 +118,36 @@ class TwitterDataset():
 
         return tokenized
 
+    def tokenize(self, tokenize_fn):
+        tokenized = self.dataset.map(tokenize_fn, batched=True)
+        tokenized["train"].set_format(type='torch', columns=['input_ids', 'label'])
+        tokenized["eval"].set_format(type='torch', columns=['input_ids', 'label'])
+        tokenized["test"].set_format(type='torch', columns=['input_ids'])
+        return tokenized
 
 if __name__ == "__main__":
-    from utils import load_config, set_seed
-
-    cfg = load_config()
-    set_seed(cfg.general.seed)
-    twitter = TwitterDataset(cfg)
-    #tokenized_dataset = twitter.tokenize_to_hf(AutoTokenizer.from_pretrained(cfg.llm.model))
-    
     from tqdm import tqdm
     from data_loader import TwitterDataset
     from torch.utils.data import DataLoader
     from transformers import DataCollatorWithPadding, AutoTokenizer
-    
+
+    from utils import load_config, set_seed
+
+    cfg = load_config()
+    set_seed(cfg.general.seed)
+
+    twitter = TwitterDataset(cfg)
     tokenizer = AutoTokenizer.from_pretrained(cfg.llm.model)
     tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
-    
+
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=1, collate_fn=data_collator)
     eval_dl = DataLoader(tokenized_dataset['eval'], shuffle=True, batch_size=1, collate_fn=data_collator)
     test_dl = DataLoader(tokenized_dataset['test'], shuffle=False, batch_size=1, collate_fn=data_collator)
-    
+
     count = 0
     max_len = 0
-    with tqdm(enumerate(train_dl), total=len(train_dl), desc=f"Train") as pbar:
-        for batch, x in pbar:
-            max_len = max(max_len, x['input_ids'].shape[1])
-            if len(x['input_ids'][0]) > 64: count += 1 
-            pbar.set_postfix({'Max len': max_len, 'Count': count})
-    
-    count = 0
-    max_len = 0
-    with tqdm(enumerate(eval_dl), total=len(eval_dl), desc=f"Eval") as pbar:
+    with tqdm(enumerate(train_dl), total=len(train_dl), desc="Train") as pbar:
         for batch, x in pbar:
             max_len = max(max_len, x['input_ids'].shape[1])
             if len(x['input_ids'][0]) > 64: count += 1 
@@ -140,7 +155,15 @@ if __name__ == "__main__":
 
     count = 0
     max_len = 0
-    with tqdm(enumerate(test_dl), total=len(test_dl), desc=f"Test") as pbar:
+    with tqdm(enumerate(eval_dl), total=len(eval_dl), desc="Eval") as pbar:
+        for batch, x in pbar:
+            max_len = max(max_len, x['input_ids'].shape[1])
+            if len(x['input_ids'][0]) > 64: count += 1 
+            pbar.set_postfix({'Max len': max_len, 'Count': count})
+
+    count = 0
+    max_len = 0
+    with tqdm(enumerate(test_dl), total=len(test_dl), desc="Test") as pbar:
         for batch, x in pbar:
             max_len = max(max_len, x['input_ids'].shape[1])
             if len(x['input_ids'][0]) > 64: count += 1 

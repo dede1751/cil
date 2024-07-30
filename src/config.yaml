@@ -1,6 +1,6 @@
 general:
   seed: 42
-  run_id: 'btwt-b-b32-e5-soft'
+  run_id: 'nn'
 
 data:
   use_full_dataset: True
@@ -8,23 +8,10 @@ data:
   eval_split: 0.05
   path: '../twitter-datasets/'
   checkpoint_path: 'checkpoints/'
-  dedup_strategy: 'smooth'
+  dedup_strategy: 'hard'
   smoothing_epsilon: 0.01
-
-llm:
-  model: 'vinai/bertweet-base'
-  resume_from_checkpoint: null
-  use_fp16: False
-  use_lora: False
-  lora_r: 16
-  lora_alpha: 32
-  max_len: 64
-  epochs: 3
-  lr: 1.e-4
-  warmup_steps: 500
-  batch_size: 32
-  gradient_accumulation_steps: 1
-  weight_decay: 0.01
+  sparse_max_features: 1000
+  max_length: 128
 
 lstm:
   resume_from_checkpoint: null
@@ -34,3 +21,73 @@ lstm:
   embedding_dim: 128 
   hidden_dim: 512
   layers: 3
+
+logit: 
+  max_iter: 1000
+
+rf:
+  n_estimators: 100
+  max_depth: 50
+  max_features: 50
+
+svm: 
+  kernel: 'rbf'
+  class_weight: 'balanced'
+  C: 1.0
+
+embedding:
+  name: 'glove'
+  folder: 'pretrained_embeddings'
+  dim: 200
+  freeze: True
+
+nn: 
+  hidden_layers: 3
+  hidden_units: 128
+  dropout_prob: 0.0
+  lr: 1.e-4
+  epochs: 100
+  batch_size: 32
+
+llm:
+  model: 'cardiffnlp/twitter-roberta-large-2022-154m'
+  resume_from_checkpoint: null
+  use_fp16: False
+  use_lora: True
+  lora_r: 16
+  lora_alpha: 32
+  max_len: 64
+  epochs: 3
+  lr: 2.e-5
+  warmup_steps: 500
+  batch_size: 32
+  gradient_accumulation_steps: 1
+  weight_decay: 0.01
+
+ensemble:
+  path: 'ensemble/'
+  models:
+    - name: 'btwt-l-lora16-b32-e5-smooth'
+      base_model: 'vinai/bertweet-large'
+      max_len: 64
+      lora_r: 16
+    - name: 'btwt-b-b32-e5-smooth'
+      base_model: 'vinai/bertweet-base'
+      max_len: 128
+      lora_r: null
+    - name: 'btwt-b-b32-e5-soft'
+      base_model: 'vinai/bertweet-base'
+      max_len: 128
+      lora_r: null
+    - name: 'btwt-b-b32-e5-none'
+      base_model: 'vinai/bertweet-base'
+      max_len: 128
+      lora_r: null
+    - name: 'rbrt-b-b32-e5-smooth'
+      base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+      max_len: 128
+      lora_r: null
+    - name: 'rbrt-b-b32-e5-hard'
+      base_model: 'cardiffnlp/twitter-roberta-base-sentiment-latest'
+      max_len: 128
+      lora_r: null

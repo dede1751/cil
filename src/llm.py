@@ -5,35 +5,22 @@ import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from datasets import DatasetDict
+from datasets import DatasetDict, Dataset
 from transformers import (
     AutoTokenizer, AutoModel, DataCollatorWithPadding,
     Trainer, TrainingArguments, EarlyStoppingCallback,)
+from safetensors import safe_open
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
-import evaluate
 
+from utils import THRESHOLD, compute_metrics
 
-THRESHOLD = 0.5
-
-
-def preprocessor(tweet: str) -> str:
-    """Custom preprocessor for the Bertweet Tokenizer."""
-    return tweet.replace("<user>", "@USER").replace("<url>", "http")
-
-
-def compute_metrics(eval_pred):
-    load_accuracy = evaluate.load("accuracy")
-    load_f1 = evaluate.load("f1")
-    predictions, labels = eval_pred
-
-    predictions = (predictions >= THRESHOLD).astype(int)
-    labels = labels.astype(int)
-
-    return {
-        "accuracy": load_accuracy.compute(predictions=predictions, references=labels)["accuracy"],
-        "f1": load_f1.compute(predictions=predictions, references=labels)["f1"]
-    }
+preprocessor = {
+    "vinai/bertweet-base": lambda tweet: tweet.replace("<user>", "@USER").replace("<url>", "http"),
+    "vinai/bertweet-large": lambda tweet: tweet.replace("<user>", "@USER").replace("<url>", "http"),
+    "cardiffnlp/twitter-roberta-base-sentiment-latest": lambda tweet: tweet.replace("<user>", "@user").replace("<url>", "http"),
+    "cardiffnlp/twitter-roberta-large-2022-154m": lambda tweet: tweet.replace("<user>", "@user").replace("<url>", "http"),
+}
 
 
 class CustomRobertaForSequenceClassification(nn.Module):
@@ -41,9 +28,10 @@ class CustomRobertaForSequenceClassification(nn.Module):
 
     def __init__(self, original_model):
         super(CustomRobertaForSequenceClassification, self).__init__()
+        self.config = original_model.config
         self.roberta = original_model
-        self.classifier_dropout = nn.Dropout(original_model.config.hidden_dropout_prob)
-        self.classifier = nn.Linear(original_model.config.hidden_size, 1)
+        self.classifier_dropout = nn.Dropout(self.config.hidden_dropout_prob)
+        self.classifier = nn.Linear(self.config.hidden_size, 1)
 
     def forward(
         self,
@@ -55,7 +43,8 @@ class CustomRobertaForSequenceClassification(nn.Module):
         inputs_embeds=None,
         labels=None,
         output_attentions=None,
-        output_hidden_states=None
+        output_hidden_states=None,
+        return_dict=None,
     ):
         outputs = self.roberta(
             input_ids,
@@ -98,10 +87,10 @@ class LLMClassifier():
                 r=self.cfg.llm.lora_r,
                 lora_alpha=self.cfg.llm.lora_alpha,
                 use_rslora=True,
-                target_modules=["query", "value"],
+                target_modules=["query", "value", "key", "dense"],
                 lora_dropout=0.1,
                 bias="none",
-                modules_to_save=["classifier"],
+                modules_to_save=["classifier", "classifier_dropout"],
                 task_type=TaskType.SEQ_CLS,
             )
 
@@ -109,8 +98,28 @@ class LLMClassifier():
 
         trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         precision = "fp16" if self.cfg.llm.use_fp16 else "fp32"
-        print(f"\n'{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.\n")
+        print(
+            f"[+] '{self.cfg.llm.model}' loaded with {trainable} trainable {precision} parameters.")
 
+    def load_checkpoint(self, path: str, adapter: bool = False):
+        """
+        Load a model checkpoint from a 'model.safetensors' file.
+        If 'adapter' is set to True, will instead load 'adapter_config.json' and
+        'adapter_model.safetensors' in the path directory.
+        :param path: Path to the model files.
+        :param adapter: Load the model with an adapter instead of the full state_dict.
+        """
+        if adapter:
+            self.model.load_adapter(path, adapter_name="lora")
+            self.model.set_adapter("lora")
+            return
+
+        safetensor_file = os.path.join(path, "model.safetensors")
+        state_dict = {}
+        with safe_open(safetensor_file, framework="pt", device="cpu") as f:
+            for k in f.keys():
+                state_dict[k] = f.get_tensor(k)
+        self.model.load_state_dict(state_dict)
 
     def train(self, dataset: DatasetDict):
         """
@@ -149,25 +158,29 @@ class LLMClassifier():
         )
         trainer.train(resume_from_checkpoint=self.cfg.llm.resume_from_checkpoint)
 
-    def test(self, dataset: DatasetDict) -> np.ndarray:
+    def test(self, dataset: Dataset, hard_labels: bool = True) -> np.ndarray:
         """
         Run the model on the test dataset.
         :param dataset: Tokenized split datasets ready for the HF Trainer
-        :return: Test dataset output labels (-1 for negative, 1 for positive)
+        :param hard_labels: Return {-1, 1} labels if True, probability that label is 1 otherwise
+        :return: np.ndarray of shape (n_samples,) with test dataset labels.
         """
         self.model.to(self.device)
         self.model.eval()
 
-        loader = DataLoader(dataset["test"], batch_size=self.cfg.llm.batch_size, shuffle=False)
+        loader = DataLoader(dataset, batch_size=self.cfg.llm.batch_size, shuffle=False)
         results = []
         with torch.no_grad():
             sigmoid = nn.Sigmoid()
-            for batch in tqdm(loader, desc="Computing Submission"):
+            for batch in tqdm(loader, desc="Inference"):
                 inputs = {k: v.to(self.device) for k, v in batch.items()}
-                outputs = self.model(**inputs)[0]
-                outputs = sigmoid(outputs).cpu().detach().numpy()
+                outputs = self.model(
+                    input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])[0]
 
-                result = np.where(outputs >= THRESHOLD, 1, -1).reshape(-1, 1)
+                result = sigmoid(outputs).cpu().detach().numpy().reshape(-1, 1)
+                if hard_labels:
+                    result = np.where(result >= THRESHOLD, 1, -1)
+
                 results.append(result)
 
         return np.squeeze(np.vstack(results))
@@ -181,9 +194,9 @@ if __name__ == "__main__":
     set_seed(cfg.general.seed)
 
     llm = LLMClassifier(cfg)
-    twitter = TwitterDataset(cfg, preprocessor)
+    twitter = TwitterDataset(cfg, preprocessor[cfg.llm.model])
     tokenized_dataset = twitter.tokenize_to_hf(llm.tokenizer)
     llm.train(tokenized_dataset)
 
-    llm_outputs = llm.test(tokenized_dataset)
+    llm_outputs = llm.test(tokenized_dataset["test"])
     save_outputs(llm_outputs, cfg.general.run_id)
