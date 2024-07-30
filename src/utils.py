@@ -7,6 +7,8 @@ import yaml
 import torch
 import evaluate
 
+THRESHOLD = 0.5
+
 def load_config() -> Box:
     """
     Loads the global configuration file.
@@ -41,7 +43,7 @@ def save_outputs(outputs: np.ndarray, file_name: str):
         f'{file_name}.csv', combined, delimiter=',', fmt='%d', header="Id,Prediction", comments='')
 
 
-def compute_metrics(eval_pred, THRESHOLD=0.5):
+def compute_metrics(eval_pred):
     load_accuracy = evaluate.load("accuracy")
     load_f1 = evaluate.load("f1")
     predictions, labels = eval_pred

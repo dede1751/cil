@@ -95,3 +95,6 @@ ensemble:
 baselines: 
   model: "rf"
   data: "tfidf"
+
+neural_baselines:
+  model: "cnn"
