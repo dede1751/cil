@@ -121,13 +121,14 @@ class LLMClassifier():
     def load_checkpoint(self, path: str, adapter: bool = False):
         """
         Load a model checkpoint from a 'model.safetensors' file.
-        If 'adapter' is set to True, will instead laod 'adapter_config.json' and
+        If 'adapter' is set to True, will instead load 'adapter_config.json' and
         'adapter_model.safetensors' in the path directory.
         :param path: Path to the model files.
         :param adapter: Load the model with an adapter instead of the full state_dict.
         """
         if adapter:
             self.model.load_adapter(path, adapter_name="lora")
+            self.model.set_adapter("lora")
             return
 
         safetensor_file = os.path.join(path, "model.safetensors")
