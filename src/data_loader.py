@@ -75,7 +75,7 @@ class TwitterDataset():
             'eval': Dataset.from_pandas(eval_df),
             'test': Dataset.from_pandas(test_df)})
 
-    def vectorize(self, vectorizer) -> Dict[Dataset]:
+    def vectorize(self, vectorizer) -> Dict[str, Dataset]:
         """
         Vectorize the dataset.
         :return: Vectorized split datasets.
