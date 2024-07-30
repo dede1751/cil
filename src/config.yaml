@@ -55,7 +55,7 @@ llm:
   use_fp16: False
   use_lora: True
   lora_r: 16
-  lora_alpha: 32
+  lora_alpha: 16
   max_len: 64
   epochs: 3
   lr: 2.e-5
