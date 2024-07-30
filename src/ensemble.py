@@ -4,8 +4,9 @@ import os.path
 import numpy as np
 from box import Box
 
+from utils import THRESHOLD
 from data_loader import TwitterDataset
-from llm import LLMClassifier, preprocessor, THRESHOLD
+from llm import LLMClassifier, preprocessor
 
 
 def test_model(checkpoint_path: str, config: Box) -> Tuple[np.ndarray]:

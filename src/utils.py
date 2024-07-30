@@ -7,7 +7,9 @@ import yaml
 import torch
 import evaluate
 
+
 THRESHOLD = 0.5
+
 
 def load_config() -> Box:
     """
@@ -41,6 +43,7 @@ def save_outputs(outputs: np.ndarray, file_name: str):
 
     np.savetxt(
         f'{file_name}.csv', combined, delimiter=',', fmt='%d', header="Id,Prediction", comments='')
+
 
 def compute_metrics(eval_pred):
     load_accuracy = evaluate.load("accuracy")

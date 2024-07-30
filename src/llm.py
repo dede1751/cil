@@ -12,11 +12,8 @@ from transformers import (
 from safetensors import safe_open
 from tqdm import tqdm
 from peft import LoraConfig, TaskType, get_peft_model
-import evaluate
 
-
-THRESHOLD = 0.5
-
+from utils import THRESHOLD, compute_metrics
 
 preprocessor = {
     "vinai/bertweet-base": lambda tweet: tweet.replace("<user>", "@USER").replace("<url>", "http"),
@@ -24,20 +21,6 @@ preprocessor = {
     "cardiffnlp/twitter-roberta-base-sentiment-latest": lambda tweet: tweet.replace("<user>", "@user").replace("<url>", "http"),
     "cardiffnlp/twitter-roberta-large-2022-154m": lambda tweet: tweet.replace("<user>", "@user").replace("<url>", "http"),
 }
-
-
-def compute_metrics(eval_pred):
-    load_accuracy = evaluate.load("accuracy")
-    load_f1 = evaluate.load("f1")
-    predictions, labels = eval_pred
-
-    predictions = (predictions >= THRESHOLD).astype(int)
-    labels = labels.astype(int)
-
-    return {
-        "accuracy": load_accuracy.compute(predictions=predictions, references=labels)["accuracy"],
-        "f1": load_f1.compute(predictions=predictions, references=labels)["f1"]
-    }
 
 
 class CustomRobertaForSequenceClassification(nn.Module):
