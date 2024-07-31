@@ -102,3 +102,21 @@ baselines:
 
 neural_baselines:
   model: "cnn"
+
+cnn:
+  embedding_dim: 128
+  num_filters: 200
+  filter_sizes: [3, 4, 5]
+  dropout_rate: 0.5
+  batch_size: 128
+  epochs: 30
+  resume_from_checkpoint: null
+
+ffnn:
+  embedding_dim: 128  
+  hidden_dim1: 64 
+  hidden_dim2: 32 
+  dropout_rate: 0.5 
+  batch_size: 128 
+  epochs: 30 
+  resume_from_checkpoint: null 
