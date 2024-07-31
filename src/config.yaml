@@ -13,14 +13,15 @@ data:
   sparse_max_features: 1000
   max_length: 128
 
-lstm:
-  resume_from_checkpoint: null
-  bidirectional: True
-  batch_size: 128
-  epochs: 60
-  embedding_dim: 128 
-  hidden_dim: 512
-  layers: 3
+baselines: 
+  model: "rf"
+  data: "tfidf"
+
+embedding:
+  name: 'glove'
+  folder: 'pretrained_embeddings'
+  dim: 200
+  freeze: True
 
 logit: 
   max_iter: 1000
@@ -35,22 +36,38 @@ svm:
   class_weight: 'balanced'
   C: 1.0
 
-embedding:
-  name: 'glove'
-  folder: 'pretrained_embeddings'
-  dim: 200
-  freeze: True
+neural_baselines:
+  model: "ffnn"
 
-nn: 
-  hidden_layers: 3
-  hidden_units: 128
-  dropout_prob: 0.0
-  lr: 1.e-4
-  epochs: 100
-  batch_size: 32
+ffnn:
+  embedding_dim: 128  
+  hidden_dim1: 64 
+  hidden_dim2: 32 
+  dropout_rate: 0.5 
+  batch_size: 128 
+  epochs: 30 
+  resume_from_checkpoint: null 
+
+cnn:
+  embedding_dim: 128
+  num_filters: 200
+  filter_sizes: [3, 4, 5]
+  dropout_rate: 0.5
+  batch_size: 128
+  epochs: 30
+  resume_from_checkpoint: null
+
+lstm:
+  resume_from_checkpoint: null
+  bidirectional: True
+  batch_size: 128
+  epochs: 60
+  embedding_dim: 128 
+  hidden_dim: 512
+  layers: 3
 
 llm:
-  model: 'cardiffnlp/twitter-roberta-large-2022-154m'
+  model: 'vinai/bertweet-large'
   resume_from_checkpoint: null
   use_fp16: False
   use_lora: True
@@ -96,27 +113,3 @@ ensemble:
       max_len: 128
       lora_r: null
 
-baselines: 
-  model: "rf"
-  data: "tfidf"
-
-neural_baselines:
-  model: "cnn"
-
-cnn:
-  embedding_dim: 128
-  num_filters: 200
-  filter_sizes: [3, 4, 5]
-  dropout_rate: 0.5
-  batch_size: 128
-  epochs: 30
-  resume_from_checkpoint: null
-
-ffnn:
-  embedding_dim: 128  
-  hidden_dim1: 64 
-  hidden_dim2: 32 
-  dropout_rate: 0.5 
-  batch_size: 128 
-  epochs: 30 
-  resume_from_checkpoint: null 
