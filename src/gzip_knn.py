@@ -44,11 +44,8 @@ class gzipKNN:
         predictions = []
         training_labels = np.array(training_texts["label"])
         compressed_train =  [(x2["text"],self._compress_length(x2["text"])) for x2 in training_texts]
-        i = 0
+        
         for x1 in test_texts:
-            if i % 100 == 0:
-                print(f"{i}%")
-                i+=1
             x1 = x1["text"]
             Cx1 = self._compress_length(x1)
             
