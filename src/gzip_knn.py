@@ -61,14 +61,8 @@ class gzipKNN:
                 ncd = (Cx1x2 - min(Cx1, Cx2)) / max(Cx1, Cx2)
                 distances.append(ncd)
 
-            # Find indices of the k smallest distances
             sorted_idx = np.argsort(distances)
-            # print(sorted_idx)
             top_k_labels = list(training_labels[sorted_idx[:self.k]])
-            
-            # print(top_k_labels)
-            
-            # Predict the class based on majority vote
             predicted_label = max(set(top_k_labels), key=top_k_labels.count)
             predictions.append(predicted_label)
 
@@ -90,8 +84,6 @@ if __name__ == "__main__":
     
     predictions = model.predict(test, train)
     
-    
-    print("shape: " predictions.shape)
     predictions = np.where(predictions == 0, -1, 1)
     save_outputs(np.array(predictions), cfg.general.run_id)
 
