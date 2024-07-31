@@ -27,20 +27,31 @@ cil/
 │   │   └── adapter_model/
 │   │       ├── adapter_model.safetensors
 │   │       └── adapter_config.json
-│   ├── pretrained_embeddings/         # Embeddings used in baselines
-│   │   └── ...
+│   ├── pretrained_embeddings/
+│   │   ├── glove.25d.txt
+│   │   ├── glove.50d.txt
+│   │   ├── glove.100d.txt
+│   │   └── glove.200d.txt
 │   ├── config.yaml                    # Global config used by all models
+│   ├── baselines.py                   # Train and test Logistic/RandomForest/SVM classifiers
+│   ├── neural_baselines.py            # Train and test FFNN/CNN/LSTM networks
+│   ├── gzip_knn.py                    # Test the GZIP K-Nearest-Neighbor classifier
+│   ├── llm.py                         # Train and test LLM classifiers
 │   ├── ensemble.py                    # Compute outputs for models in LLM ensemble
 │   ├── ensemble.ipynb                 # Train mixing model
-│   └── ...                            # Scripts to train and test specific baselines
-├── twitter-datasets/                  # Full/Subsampled Twitter datasets
-│   └── ...
+│   └── ...                            # Model-specific scripts
+├── twitter-datasets/
+│   ├── test_data.txt
+│   ├── train_neg_full.txt
+│   ├── train_neg.txt
+│   ├── train_pos_full.txt
+│   └── train_pos.txt
 ├── requirements.txt                   # pip requirements file
 └── README.md                          # Project documentation
 ```
 
 ## Running Models
-Each individual model can be trained and tested using its corresponding script, such as `svm.py` or `llm.py`. This will output a `<config.general.run_id>.csv` file in the format of the Kaggle submission.
+Each individual model can be trained and tested using the script specified in the directory structure. This will output a `<config.general.run_id>.csv` file in the format of the Kaggle submission.
 
 Each model has a separate section in `config.yaml` which needs to be configured before execution.
 
