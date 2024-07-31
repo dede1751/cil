@@ -51,7 +51,10 @@ if __name__ == "__main__":
     optimizer = optim.Adam(model.parameters())
 
     twitter = TwitterDataset(cfg)
-    tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
+    if cfg.neural_baselines.model == "lstm":
+        tokenized_dataset = twitter.tokenize_to_hf(tokenizer, padding=False)
+    else:
+        tokenized_dataset = twitter.tokenize_to_hf(tokenizer)
 
     train_dl = DataLoader(tokenized_dataset['train'], shuffle=True, batch_size=batch_size, collate_fn=data_collator)
     eval_dl = DataLoader(tokenized_dataset['eval'], shuffle=True, batch_size=batch_size, collate_fn=data_collator)
