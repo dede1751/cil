@@ -73,7 +73,7 @@ if __name__ == "__main__":
     
     dataset = twitter._load_dataset()
     
-    train = dataset["train"].select(range(0,2000000,2000))
+    train = dataset["train"].select(range(0,2000000,5))
     
     test = dataset["test"].select(range(0,10000))
     
