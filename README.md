@@ -53,7 +53,10 @@ cil/
 ## Running Models
 Each individual model can be trained and tested using the script specified in the directory structure. This will output a `<config.general.run_id>.csv` file in the format of the Kaggle submission.
 
-Each model has a separate section in `config.yaml` which needs to be configured before execution.
+Each model has a separate section in `config.yaml` to configure hyperparameters. The specific model used by `baselines.py` and `neural_baselines.py` can then be selected like so:
+* `config.baselines.model` should be set to *'logit'* for Logistic Regression, *'rf'* for Random Forest or *'svm'* for the Support Vector Machine.
+* `config.baselines.data` should be set to *'count'* to use word count embeddings, *'tfidf'* for TF-IDF or *'glove'* for Glove embeddings.
+* `config.neural_baselines.model` should be set to *'ffnn'* for the Feed-Forward NN, *'cnn'* for the CNN or *'lstm'* for the LSTM.
 
 ## Running Ensembles
 For ensembles, the practice is slightly more involved as we assume the individual models to be already trained. Each model in the ensemble needs to be explicitly added to `config.ensemble.models`. The `name` field should correspond to a folder in the `src/ensemble` directory. Note that the files we expect differ between models being fully finetuned and models being trained with *LoRa* (refer to directory structure)

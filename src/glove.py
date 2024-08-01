@@ -1,3 +1,5 @@
+from typing import List
+
 from box import Box
 import numpy as np
 import pandas as pd
@@ -22,7 +24,7 @@ class GloveEmbedding:
             self.embeddings.append(vector.values.astype(np.float32))
             idx += 1
     
-    def get_tokens_id(self, tokens: list[str]) -> list[np.ndarray]:
+    def get_tokens_id(self, tokens: List[str]) -> List[np.ndarray]:
         token_ids = [self.vocab.get(token, self.vocab[self.unknown_token]) for token in tokens]
         token_ids += [0] * (self.cfg.data.max_length - len(token_ids))
         return token_ids
