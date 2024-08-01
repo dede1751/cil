@@ -75,7 +75,7 @@ if __name__ == "__main__":
     
     train = dataset["train"].select(range(0,2000000,5))
     
-    test = dataset["test"].select(range(0,10000))
+    test = dataset["test"]
     
     model = gzipKNN()
     
