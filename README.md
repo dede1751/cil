@@ -14,6 +14,8 @@ $ source venv/bin/activate
 $ pip install -r requirements.txt
 ```
 
+Make sure to properly populate the `twitter-datasets` folder as well as the pretrained GloVe embeddings
+which can be downladed from the following [link](https://nlp.stanford.edu/data/glove.twitter.27B.zip).
 The project directory is structured as follows:
 
 ```
@@ -57,6 +59,8 @@ Each model has a separate section in `config.yaml` to configure hyperparameters.
 * `config.baselines.model` should be set to *'logit'* for Logistic Regression, *'rf'* for Random Forest or *'svm'* for the Support Vector Machine.
 * `config.baselines.data` should be set to *'count'* to use word count embeddings, *'tfidf'* for TF-IDF or *'glove'* for Glove embeddings.
 * `config.neural_baselines.model` should be set to *'ffnn'* for the Feed-Forward NN, *'cnn'* for the CNN or *'lstm'* for the LSTM.
+
+The scripts are expected to be run from the ```src``` folder.
 
 ## Running Ensembles
 For ensembles, the practice is slightly more involved as we assume the individual models to be already trained. Each model in the ensemble needs to be explicitly added to `config.ensemble.models`. The `name` field should correspond to a folder in the `src/ensemble` directory. Note that the files we expect differ between models being fully finetuned and models being trained with *LoRa* (refer to directory structure)
