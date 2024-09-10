@@ -2,6 +2,8 @@
 
 Lorenzo Benedetti, Tommaso Di Mario, Andrea Sgobbi,  Gabriel Tavernini
 
+Our work achieved **1st place** on the private [Kaggle leaderboard](https://www.kaggle.com/competitions/ethz-cil-text-classification-2024/leaderboard), achieving an accuracy of **92.14%**. Refer to ```report.pdf``` for the detailed results.
+
 ## Problem Statement
 Given a set of **Tweets**, predict *positive*/*negative* sentiment. The labels are assigned based on the presence of positive `:)` or negative `:(` emojis, hence there is non-negligible label noise (sarcasm) and the possibility of different labels for the same Tweet.
 
@@ -49,6 +51,7 @@ cil/
 │   ├── train_pos_full.txt
 │   └── train_pos.txt
 ├── requirements.txt                   # pip requirements file
+├── report.pdf                         # Final Hand-In
 └── README.md                          # Project documentation
 ```
 
